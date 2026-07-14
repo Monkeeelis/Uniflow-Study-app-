@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Calendar Header -->
+<section class="flex flex-col md:flex-row md:items-center justify-between gap-gutter mb-stack-lg">
+    <div class="flex items-center gap-6">
+        <div class="flex gap-2 select-none">
+            <a href="/calendar?week_offset={{ prev_offset }}" class="w-10 h-10 rounded-full border border-ink-deep flex items-center justify-center hover:bg-surface-container-low transition-colors active:scale-95">
+                <span class="material-symbols-outlined">chevron_left</span>
+            </a>
+            <a href="/calendar?week_offset={{ next_offset }}" class="w-10 h-10 rounded-full border border-ink-deep flex items-center justify-center hover:bg-surface-container-low transition-colors active:scale-95">
+                <span class="material-symbols-outlined">chevron_right</span>
+            </a>
+        </div>
+        <h1 class="font-headline-lg text-headline-lg text-ink-deep">{{ range_label }}</h1>
+        <span class="bg-surface-container-high px-4 py-1 rounded-full text-label-caps font-label-caps">Week View</span>
+    </div>
+    
+    <a href="#add-event-modal" class="bg-ink-deep text-paper-base px-6 py-3 rounded-lg font-label-caps text-label-caps flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-sm select-none">
+        <span class="material-symbols-outlined text-[18px]">add</span> Add Event
+    </a>
+</section>
+
+<!-- Calendar Grid Container -->
+<div class="bg-paper-base rounded-xl border border-outline-variant overflow-hidden">
+    <!-- Day Labels -->
+    <div class="grid grid-cols-[80px_repeat(7,1fr)] bg-surface-container border-b border-outline-variant text-center font-bold">
+        <div class="h-14 flex items-center justify-center border-r border-outline-variant">
+            <span class="material-symbols-outlined text-outline">schedule</span>
+        </div>
+        {% for day in week_days %}
+        <div class="h-14 flex flex-col items-center justify-center border-r border-outline-variant {% if day.is_today %}bg-secondary-container/20 text-terracotta-accent{% endif %}">
+            <span class="font-label-caps text-[10px] text-on-surface-variant">{{ day.name }}</span>
+            <span class="font-headline-md text-headline-md leading-none mt-1">{{ day.num }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Time Slots Grid -->
+    <div class="relative grid grid-cols-[80px_repeat(7,1fr)] h-[720px] overflow-y-auto custom-scrollbar">
+        <!-- Hour Labels -->
+        <div class="flex flex-col select-none border-r border-outline-variant">
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">8 AM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">9 AM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">10 AM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">11 AM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">12 PM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">1 PM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">2 PM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">3 PM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">4 PM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">5 PM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">6 PM</span></div>
+            <div class="h-[60px] flex items-start justify-center pt-2 calendar-cell"><span class="text-label-caps opacity-60">7 PM</span></div>
+        </div>
+
+        <!-- Column Grid Overlay Grid Background Lines (7 columns) -->
+        {% for slot in range(12) %}
+        <div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div>
+        {% endfor %}
+
+        <!-- Dynamic Event Overlay Container -->
+        <div class="absolute inset-0 pointer-events-none left-[80px]" id="calendar-event-overlay">
+            
+            <!-- Render events and To-Dos side-by-side using Python computed coordinates -->
+            {% for item in grid_items %}
+                {% set col_width_pct = 14.2857 / item.total_cols %}
+                {% set col_left_pct = (item.dayOfWeek * 14.2857) + (item.col_index * col_width_pct) %}
+                
+                {% if item.type == 'event' %}
+                <!-- Event Box -->
+                <a href="#edit-event-modal-{{ item.id }}" class="absolute pointer-events-auto bg-surface border border-outline-variant/60 p-2.5 rounded-lg event-card border-l-4 overflow-hidden flex flex-col justify-between"
+                     style="left: calc({{ col_left_pct }}% + 4px); width: calc({{ col_width_pct }}% - 8px); top: {{ item.top }}px; height: {{ item.height }}px; border-left-color: {{ item.color }};">
+                     <div>
+                         <h4 class="font-label-caps text-ink-deep leading-tight truncate text-[11px] font-bold">{{ item.title }}</h4>
+                         <p class="text-[9px] text-on-surface-variant mt-0.5 flex items-center gap-1 select-none">
+                             <span class="material-symbols-outlined text-[10px]">school</span> 
+                             <span class="truncate">{{ item.location }}</span>
+                         </p>
+                     </div>
+                     <p class="text-[9px] text-on-surface-variant font-semibold mt-0.5">{{ item.timeStart }} - {{ item.timeEnd }}</p>
+                </a>
+                {% else %}
+                <!-- To-Do Item Box on Calendar -->
+                <div class="absolute pointer-events-auto bg-paper-base/80 border border-outline-variant/60 p-1.5 rounded event-card border-l-4 overflow-hidden flex items-center gap-1"
+                     style="left: calc({{ col_left_pct }}% + 4px); width: calc({{ col_width_pct }}% - 8px); top: {{ item.top }}px; height: {{ item.height }}px; border-left-color: {{ item.color }};">
+                     <!-- Completed check button -->
+                     <form action="/todo/toggle/{{ item.id }}?redirect=calendar" method="POST" class="inline">
+                         <button type="submit" class="w-4 h-4 rounded border border-outline flex items-center justify-center bg-background hover:border-terracotta-accent transition-all">
+                             {% if item.completed %}
+                             <span class="material-symbols-outlined text-[10px] text-terracotta-accent font-bold">check</span>
+                             {% endif %}
+                         </button>
+                     </form>
+                     <div class="truncate">
+                         <h4 class="text-[9px] text-ink-deep font-bold truncate {% if item.completed %}line-through opacity-60{% endif %}">{{ item.title }}</h4>
+                         <p class="text-[8px] text-on-surface-variant font-semibold">Due {{ item.timeStart }}</p>
+                     </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+
+            <!-- Current Time Line Indicator (approximate) -->
+            {% if show_time_indicator %}
+            <div class="absolute left-0 w-full flex items-center pointer-events-none" style="top: {{ current_time_top }}px;">
+                <div class="w-2.5 h-2.5 rounded-full bg-terracotta-accent -ml-1.5"></div>
+                <div class="flex-grow h-[1.5px] bg-terracotta-accent opacity-50 border-dashed border-t"></div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Floating Mascot Decoration -->
+<div class="fixed bottom-20 right-12 hidden lg:flex items-center gap-4 bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-outline-variant shadow-xl rotate-3 pointer-events-none z-10 select-none">
+    <div class="w-12 h-12 flex items-center justify-center bg-paper-base rounded-full border border-ink-deep">
+        <span class="material-symbols-outlined text-ink-deep text-3xl">face</span>
+    </div>
+    <div>
+        <p class="font-label-caps text-[10px] uppercase tracking-wider text-on-surface-variant">Buddy Says</p>
+        <p class="font-body-md text-ink-deep font-semibold italic text-sm">"{{ grid_items|length }} items scheduled this week. Keep up the rhythm!"</p>
+    </div>
+</div>
+
+<!-- MODAL: ADD EVENT (CSS Target Hack) -->
+<div id="add-event-modal" class="fixed inset-0 bg-ink-deep/40 backdrop-blur-sm hidden target:flex items-center justify-center z-50">
+    <div class="paper-card w-full max-w-md rounded-xl p-gutter border border-outline-variant bg-background relative">
+        <div class="flex justify-between items-center mb-stack-md">
+            <h3 class="font-headline-md text-headline-md text-ink-deep">Add New Event</h3>
+            <a href="#" class="material-symbols-outlined text-ink-deep hover:bg-surface-container-low p-1 rounded-full transition-all">close</a>
+        </div>
+        <form action="/calendar/add" method="POST">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="event-title">Event Title</label>
+                    <input type="text" id="event-title" name="title" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent" placeholder="e.g. Psychology Lecture">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="event-date">Specific Date</label>
+                        <input type="date" id="event-date" name="date" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-1.5 focus:ring-terracotta-accent focus:border-terracotta-accent">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="event-category">Category (Subject)</label>
+                        <!-- Category Input Box (Free text!) -->
+                        <input type="text" id="event-category" name="category" list="subjects-datalist" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent" placeholder="Type Category...">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="event-start">Start Time</label>
+                        <input type="time" id="event-start" name="timeStart" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="event-end">End Time</label>
+                        <input type="time" id="event-end" name="timeEnd" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-1">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="event-location">Location / Room</label>
+                    <input type="text" id="event-location" name="location" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent" placeholder="e.g. Room 402 • Hall A">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <a href="#" class="border border-ink-deep/30 text-ink-deep px-4 py-2 rounded-lg font-label-caps text-[11px] hover:bg-surface-container-low transition-all">CANCEL</a>
+                <button type="submit" class="bg-ink-deep text-paper-base px-5 py-2 rounded-lg font-label-caps text-[11px] hover:opacity-90 transition-all">SAVE EVENT</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODALS: EDIT EVENT (Generate target modal for each rendered event) -->
+{% for item in grid_items %}
+    {% if item.type == 'event' %}
+    <div id="edit-event-modal-{{ item.id }}" class="fixed inset-0 bg-ink-deep/40 backdrop-blur-sm hidden target:flex items-center justify-center z-50">
+        <div class="paper-card w-full max-w-md rounded-xl p-gutter border border-outline-variant bg-background relative text-left">
+            <div class="flex justify-between items-center mb-stack-md">
+                <h3 class="font-headline-md text-headline-md text-ink-deep">Edit Event Details</h3>
+                <a href="#" class="material-symbols-outlined text-ink-deep hover:bg-surface-container-low p-1 rounded-full transition-all">close</a>
+            </div>
+            <form action="/calendar/edit" method="POST">
+                <input type="hidden" name="id" value="{{ item.id }}">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="edit-event-title-{{ item.id }}">Event Title</label>
+                        <input type="text" id="edit-event-title-{{ item.id }}" name="title" value="{{ item.title }}" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="edit-event-date-{{ item.id }}">Specific Date</label>
+                            <input type="date" id="edit-event-date-{{ item.id }}" name="date" value="{{ item.date }}" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-1.5 focus:ring-terracotta-accent focus:border-terracotta-accent">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="edit-event-category-{{ item.id }}">Category (Subject)</label>
+                            <!-- Category Input Box (Free text!) -->
+                            <input type="text" id="edit-event-category-{{ item.id }}" name="category" list="subjects-datalist" value="{{ item.category }}" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="edit-event-start-{{ item.id }}">Start Time</label>
+                            <input type="time" id="edit-event-start-{{ item.id }}" name="timeStart" value="{{ item.timeStart }}" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-1">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="edit-event-end-{{ item.id }}">End Time</label>
+                            <input type="time" id="edit-event-end-{{ item.id }}" name="timeEnd" value="{{ item.timeEnd }}" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-1">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="edit-event-location-{{ item.id }}">Location / Room</label>
+                        <input type="text" id="edit-event-location-{{ item.id }}" name="location" value="{{ item.location }}" required class="w-full rounded-lg border-outline-variant bg-paper-base text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <a href="#" class="border border-ink-deep/30 text-ink-deep px-4 py-2 rounded-lg font-label-caps text-[11px] hover:bg-surface-container-low transition-all">CANCEL</a>
+                    <button type="submit" name="action" value="delete" class="bg-error text-white px-4 py-2 rounded-lg font-label-caps text-[11px] hover:bg-opacity-95 transition-all">DELETE</button>
+                    <button type="submit" name="action" value="save" class="bg-ink-deep text-paper-base px-5 py-2 rounded-lg font-label-caps text-[11px] hover:opacity-90 transition-all">SAVE CHANGES</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
+
+{% endblock %}

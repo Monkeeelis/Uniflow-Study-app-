@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if taking_quiz_mode %}
+<!-- INTERACTIVE QUIZ PLAYING -->
+<div class="space-y-gutter max-w-2xl mx-auto py-8">
+    <div class="flex items-center justify-between border-b border-outline-variant pb-4 mb-6">
+        <div>
+            <h2 class="font-headline-lg text-headline-lg text-ink-deep">{{ quiz.title }}</h2>
+            <p class="text-on-surface-variant text-xs uppercase tracking-wider font-semibold">Study Session Arena</p>
+        </div>
+        <a href="/quizzes" class="text-xs text-error hover:underline flex items-center gap-0.5 select-none">
+            <span class="material-symbols-outlined text-sm">cancel</span> Quit Quiz
+        </a>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="space-y-2 mb-8 select-none">
+        <div class="flex justify-between text-xs font-semibold text-terracotta-accent">
+            <span>Question {{ current_display_idx }} of {{ total_questions }}</span>
+            <span>{{ pct_progress }}% Completed</span>
+        </div>
+        <div class="w-full bg-surface-container h-2 rounded-full">
+            <div class="bg-terracotta-accent h-2 rounded-full transition-all duration-500" style="width: {{ pct_progress }}%;"></div>
+        </div>
+    </div>
+
+    <!-- Question Container -->
+    <div class="paper-card rounded-2xl p-8 bg-paper-base mb-6 animate-fade-in">
+        <p class="text-[10px] font-label-caps text-terracotta-accent uppercase tracking-widest font-bold mb-2">QUESTION {{ current_display_idx }}</p>
+        <h3 class="text-lg font-bold text-ink-deep leading-relaxed">{{ question.q }}</h3>
+    </div>
+
+    <!-- Options Selection Form -->
+    <form action="/quizzes/submit" method="POST" class="grid grid-cols-1 gap-3 select-none">
+        <input type="hidden" name="quiz_id" value="{{ quiz.id }}">
+        <input type="hidden" name="q_idx" value="{{ q_idx }}">
+
+        {% for opt in question.options %}
+        <button type="submit" name="answer" value="{{ opt.key }}" class="w-full text-left p-4 rounded-xl border border-outline-variant bg-background hover:bg-secondary-container/10 hover:border-terracotta-accent text-ink-deep font-bold transition-all text-xs flex items-center gap-3">
+            <span class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center font-bold text-xs flex-shrink-0 border border-outline-variant/50 text-ink-deep">{{ opt.key }}</span>
+            <span>{{ opt.text }}</span>
+        </button>
+        {% endfor %}
+    </form>
+</div>
+
+{% elif summary_mode %}
+<!-- QUIZ SUMMARY / SCORECARD -->
+<div class="space-y-gutter max-w-2xl mx-auto py-8">
+    <div class="text-center py-6">
+        <div class="w-20 h-20 rounded-full bg-secondary-container/20 border-2 border-terracotta-accent flex items-center justify-center mx-auto mb-4">
+            <span class="material-symbols-outlined text-4xl text-terracotta-accent">workspace_premium</span>
+        </div>
+        <h2 class="font-headline-lg text-headline-lg text-ink-deep">Quiz Scorecard</h2>
+        <p class="text-on-surface-variant font-body-lg mt-1 italic">“{{ quiz.title }}” Completed</p>
+    </div>
+
+    <!-- Large Score Box -->
+    <div class="paper-card p-6 rounded-2xl bg-paper-base text-center max-w-sm mx-auto my-6 border-2 border-ink-deep/20">
+        <div class="text-xs font-label-caps text-on-surface-variant font-bold uppercase tracking-wider">FINAL SCORE</div>
+        <div class="text-5xl font-extrabold text-ink-deep mt-2">{{ score }} / {{ total }}</div>
+        <div class="text-xs text-on-surface-variant mt-2 font-semibold text-terracotta-accent">Mastered {{ score_pct }}% of the material</div>
+    </div>
+
+    <!-- Alert for incorrect review deck -->
+    <div class="bg-secondary-container/10 border border-terracotta-accent/30 rounded-xl p-4 text-xs text-ink-deep text-center leading-relaxed max-w-md mx-auto my-4">
+        💡 <strong>Quiz Reviews:</strong> Incorrect answers have been automatically logged as active review cards inside the <strong>Quiz Reviews</strong> flashcard deck on the Revise tab!
+    </div>
+
+    <!-- Review Section -->
+    <div class="space-y-4">
+        <h3 class="font-headline-md text-sm text-ink-deep font-bold uppercase tracking-wider border-b border-outline-variant pb-2">Questions Review</h3>
+        
+        {% for review in reviews %}
+        <div class="paper-card p-5 rounded-xl bg-background border border-outline-variant/60 space-y-3">
+            <div class="flex justify-between items-start gap-2">
+                <h4 class="font-bold text-ink-deep text-xs leading-relaxed">Q{{ loop.index }}: {{ review.question }}</h4>
+                {% if review.is_correct %}
+                <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">check</span> CORRECT</span>
+                {% else %}
+                <span class="bg-red-100 text-error px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">close</span> INCORRECT</span>
+                {% endif %}
+            </div>
+            
+            <div class="space-y-1.5 text-[11px]">
+                <div class="text-on-surface-variant flex items-center gap-1.5">
+                    <span class="font-bold">Correct Answer:</span>
+                    <span class="bg-surface-container px-2 py-0.5 rounded font-bold text-ink-deep">{{ review.correct_key }}</span>
+                    <span>{{ review.correct_text }}</span>
+                </div>
+                <div class="text-on-surface-variant flex items-center gap-1.5 {% if not review.is_correct %}text-error{% endif %}">
+                    <span class="font-bold">Your Selection:</span>
+                    <span class="bg-surface-container px-2 py-0.5 rounded font-bold text-ink-deep">{{ review.user_key }}</span>
+                    <span>{{ review.user_text }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="flex gap-3 justify-center select-none pt-6">
+        <a href="/quizzes/take/{{ quiz.id }}" class="border border-ink-deep text-ink-deep px-6 py-3 rounded-lg font-label-caps text-label-caps hover:bg-surface-container-low transition-all">RETAKE QUIZ</a>
+        <a href="/quizzes" class="bg-ink-deep text-paper-base px-6 py-3 rounded-lg font-label-caps text-label-caps hover:opacity-90 transition-all">BACK TO ARENA</a>
+    </div>
+</div>
+
+{% else %}
+<!-- QUIZ LIST & GENERATORS VIEW -->
+<div class="space-y-gutter">
+    <div class="border-b border-outline-variant pb-4 flex justify-between items-end">
+        <div>
+            <h2 class="font-headline-lg text-headline-lg text-ink-deep">Quizzes & Material Hub</h2>
+            <p class="text-on-surface-variant font-body-md text-body-md">Practice with structured interactive tests or generate flashcards & quizzes.</p>
+        </div>
+    </div>
+
+    <!-- Tab Bar for Quizzes Screen -->
+    <div class="flex border-b border-outline-variant pb-2 gap-4 select-none mb-6">
+        <button id="tab-arena-btn" onclick="switchQuizTab('arena')" class="font-headline-md text-xs pb-2 border-b-2 border-terracotta-accent text-terracotta-accent font-bold flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">workspace_premium</span> QUIZ ARENA
+        </button>
+        <button id="tab-ai-btn" onclick="switchQuizTab('ai')" class="font-headline-md text-xs pb-2 border-b-2 border-transparent text-on-surface-variant hover:text-ink-deep flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">psychology</span> AI SOURCE GENERATOR
+        </button>
+        <button id="tab-creator-btn" onclick="switchQuizTab('creator')" class="font-headline-md text-xs pb-2 border-b-2 border-transparent text-on-surface-variant hover:text-ink-deep flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">edit_document</span> MANUAL CREATOR
+        </button>
+    </div>
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="p-4 mb-4 text-xs rounded-xl border border-outline-variant bg-surface-container-high text-ink-deep font-bold leading-relaxed">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- TAB 1: QUIZ ARENA -->
+    <div id="quiz-tab-arena" class="space-y-4">
+        <h3 class="font-headline-md text-sm text-ink-deep font-bold uppercase tracking-wider">Available Quizzes</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for qz in quizzes %}
+            <div class="paper-card p-stack-lg rounded-xl flex items-center justify-between gap-4">
+                <div class="truncate">
+                    <h4 class="font-bold text-ink-deep text-sm truncate max-w-[220px]">{{ qz.title }}</h4>
+                    <p class="text-[10px] text-on-surface-variant mt-1 select-none flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[12px]">list_alt</span> {{ qz.questions_count }} Multiple-Choice Questions
+                    </p>
+                </div>
+                <a href="/quizzes/take/{{ qz.id }}" class="bg-ink-deep text-paper-base px-4 py-2 rounded-lg font-label-caps text-[10px] font-bold hover:bg-opacity-95 transition-all select-none">
+                    START
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- TAB 2: AI SOURCE GENERATOR -->
+    <div id="quiz-tab-ai" class="hidden max-w-xl mx-auto">
+        <div class="paper-card p-stack-lg rounded-xl bg-paper-base space-y-4">
+            <h3 class="font-headline-md text-sm text-ink-deep font-bold uppercase tracking-wider flex items-center gap-2 border-b border-outline-variant pb-2">
+                <span class="material-symbols-outlined text-terracotta-accent">psychology</span> AI Quiz & Flashcard Builder
+            </h3>
+            
+            <form action="/quizzes/generate" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-label-caps text-on-surface-variant mb-2" for="quiz-source-text">Study Source Text (Paste summaries, notes, or articles)</label>
+                    <textarea id="quiz-source-text" name="source_text" class="w-full rounded-xl border-outline-variant bg-background text-xs text-ink-deep p-3 h-32 focus:ring-terracotta-accent focus:border-terracotta-accent font-sans" placeholder="Paste study details here..."></textarea>
+                </div>
+
+                <div class="border-t border-outline-variant/60 pt-3 select-none">
+                    <label class="block text-xs font-label-caps text-on-surface-variant mb-2">Or upload study files (.pdf, .txt)</label>
+                    <input type="file" name="source_file" accept=".pdf,.txt" class="w-full text-xs text-ink-deep file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-secondary-container/20 file:text-terracotta-accent hover:file:bg-secondary-container/30">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 select-none pt-2">
+                    <button type="submit" name="generate_type" value="quiz" class="bg-ink-deep text-paper-base py-3 rounded-lg font-label-caps text-[10px] font-bold hover:bg-opacity-95 transition-all flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-xs">quiz</span> GENERATE QUIZ (MCQ)
+                    </button>
+                    <button type="submit" name="generate_type" value="flashcards" class="border border-ink-deep text-ink-deep py-3 rounded-lg font-label-caps text-[10px] font-bold hover:bg-surface-container-low transition-all flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-xs">style</span> GENERATE FLASHCARDS
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TAB 3: MANUAL CREATOR -->
+    <div id="quiz-tab-creator" class="hidden grid grid-cols-1 md:grid-cols-2 gap-gutter">
+        
+        <!-- Panel 1: Create MCQ Quiz -->
+        <div class="paper-card p-stack-lg rounded-xl bg-paper-base space-y-4">
+            <h3 class="font-headline-md text-sm text-ink-deep font-bold uppercase tracking-wider flex items-center gap-1.5 border-b border-outline-variant pb-2">
+                <span class="material-symbols-outlined text-terracotta-accent">quiz</span> Author Custom MCQ Quiz
+            </h3>
+            
+            <form action="/quizzes/create-manual" method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="quiz-title-manual">Quiz Title</label>
+                    <input type="text" id="quiz-title-manual" name="title" required class="w-full text-xs rounded-lg border-outline-variant bg-background text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent" placeholder="e.g. Memory Buffers Practice">
+                </div>
+
+                <div class="space-y-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                    {% for idx in range(1, 3) %}
+                    <div class="border border-outline-variant/60 p-3 rounded-lg bg-background/50 space-y-2">
+                        <p class="text-[9px] font-label-caps text-terracotta-accent font-bold">QUESTION {{ idx }}</p>
+                        <input type="text" name="q_{{ idx }}_text" class="w-full text-xs rounded border-outline-variant bg-background text-ink-deep py-1.5 px-2" placeholder="Question Text">
+                        
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <input type="text" name="q_{{ idx }}_a" class="rounded border-outline-variant bg-background py-1 px-2 text-[11px]" placeholder="Option A">
+                            <input type="text" name="q_{{ idx }}_b" class="rounded border-outline-variant bg-background py-1 px-2 text-[11px]" placeholder="Option B">
+                            <input type="text" name="q_{{ idx }}_c" class="rounded border-outline-variant bg-background py-1 px-2 text-[11px]" placeholder="Option C (Optional)">
+                            <input type="text" name="q_{{ idx }}_d" class="rounded border-outline-variant bg-background py-1 px-2 text-[11px]" placeholder="Option D (Optional)">
+                        </div>
+                        
+                        <div class="flex items-center gap-2 pt-1 text-xs">
+                            <span class="text-[10px] font-label-caps text-on-surface-variant">Correct Option:</span>
+                            <select name="q_{{ idx }}_correct" class="rounded border-outline-variant py-0.5 bg-background text-[11px] font-bold">
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <button type="submit" class="w-full bg-ink-deep text-paper-base py-2.5 rounded-lg font-label-caps text-[10px] font-bold hover:bg-opacity-95 transition-all">
+                    SAVE CUSTOM QUIZ
+                </button>
+            </form>
+        </div>
+
+        <!-- Panel 2: Create Flashcard Deck -->
+        <div class="paper-card p-stack-lg rounded-xl bg-paper-base space-y-4">
+            <h3 class="font-headline-md text-sm text-ink-deep font-bold uppercase tracking-wider flex items-center gap-1.5 border-b border-outline-variant pb-2">
+                <span class="material-symbols-outlined text-terracotta-accent">style</span> Author Custom Flashcard Deck
+            </h3>
+            
+            <form action="/revise/create-deck" method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-label-caps text-on-surface-variant mb-1" for="deck-title-manual">Deck Title</label>
+                    <input type="text" id="deck-title-manual" name="title" required class="w-full text-xs rounded-lg border-outline-variant bg-background text-ink-deep px-3 py-2 focus:ring-terracotta-accent focus:border-terracotta-accent" placeholder="e.g. Biology terms">
+                </div>
+
+                <div class="space-y-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                    {% for idx in range(1, 3) %}
+                    <div class="border border-outline-variant/60 p-3 rounded-lg bg-background/50 space-y-2">
+                        <p class="text-[9px] font-label-caps text-terracotta-accent font-bold">FLASHCARD {{ idx }} (2-sided)</p>
+                        <input type="text" name="q_{{ idx }}" class="w-full text-xs rounded border-outline-variant bg-background text-ink-deep py-1.5 px-2" placeholder="Front Side (Question / Term)">
+                        <textarea name="a_{{ idx }}" class="w-full text-xs rounded border-outline-variant bg-background text-ink-deep py-1.5 px-2 h-14" placeholder="Back Side (Answer / Explanation)"></textarea>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <button type="submit" class="w-full bg-ink-deep text-paper-base py-2.5 rounded-lg font-label-caps text-[10px] font-bold hover:bg-opacity-95 transition-all">
+                    SAVE CUSTOM FLASHCARD DECK
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    function switchQuizTab(tab) {
+        const btnArena = document.getElementById("tab-arena-btn");
+        const btnAI = document.getElementById("tab-ai-btn");
+        const btnCreator = document.getElementById("tab-creator-btn");
+
+        const divArena = document.getElementById("quiz-tab-arena");
+        const divAI = document.getElementById("quiz-tab-ai");
+        const divCreator = document.getElementById("quiz-tab-creator");
+
+        // Reset
+        btnArena.className = "font-headline-md text-xs pb-2 border-b-2 border-transparent text-on-surface-variant hover:text-ink-deep flex items-center gap-1.5";
+        btnAI.className = "font-headline-md text-xs pb-2 border-b-2 border-transparent text-on-surface-variant hover:text-ink-deep flex items-center gap-1.5";
+        btnCreator.className = "font-headline-md text-xs pb-2 border-b-2 border-transparent text-on-surface-variant hover:text-ink-deep flex items-center gap-1.5";
+
+        divArena.classList.add("hidden");
+        divAI.classList.add("hidden");
+        divCreator.classList.add("hidden");
+
+        if (tab === 'arena') {
+            btnArena.className = "font-headline-md text-xs pb-2 border-b-2 border-terracotta-accent text-terracotta-accent font-bold flex items-center gap-1.5";
+            divArena.classList.remove("hidden");
+        } else if (tab === 'ai') {
+            btnAI.className = "font-headline-md text-xs pb-2 border-b-2 border-terracotta-accent text-terracotta-accent font-bold flex items-center gap-1.5";
+            divAI.classList.remove("hidden");
+        } else {
+            btnCreator.className = "font-headline-md text-xs pb-2 border-b-2 border-terracotta-accent text-terracotta-accent font-bold flex items-center gap-1.5";
+            divCreator.classList.remove("hidden");
+        }
+    }
+</script>
+{% endif %}
+
+{% endblock %}

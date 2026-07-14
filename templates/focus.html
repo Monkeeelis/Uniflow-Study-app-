@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+    
+    <!-- Left Column (Timer Circle & Controls) -->
+    <div class="md:col-span-8 flex flex-col items-center justify-center py-6">
+        <div class="paper-card rounded-2xl p-8 bg-ink-deep text-paper-base border-none w-full max-w-lg flex flex-col items-center relative overflow-hidden">
+            <div class="absolute inset-0 z-0 overflow-hidden opacity-5 pointer-events-none">
+                <div class="w-full h-full" style="background-image: radial-gradient(#F5EDDC 1px, transparent 1px); background-size: 20px 20px;"></div>
+            </div>
+            
+            <div class="relative z-10 w-full flex flex-col items-center">
+                <div class="flex items-center gap-3 mb-6 select-none">
+                    <span class="material-symbols-outlined text-terracotta-accent text-3xl">local_fire_department</span>
+                    <h2 class="font-headline-lg text-headline-lg">Focus Zone</h2>
+                </div>
+
+                <!-- Preset Mode Toggles (Pomodoro, Timer, Stopwatch) -->
+                <div class="flex bg-paper-base/10 rounded-xl p-1 mb-8 gap-1 select-none text-xs">
+                    <button onclick="setTimerMode('pomodoro')" id="btn-mode-pomodoro" class="px-4 py-2 rounded-lg font-label-caps font-bold transition-all text-paper-base hover:bg-paper-base/15">
+                        POMODORO
+                    </button>
+                    <button onclick="setTimerMode('timer')" id="btn-mode-timer" class="px-4 py-2 rounded-lg font-label-caps font-bold transition-all text-paper-base hover:bg-paper-base/15">
+                        CUSTOM TIMER
+                    </button>
+                    <button onclick="setTimerMode('stopwatch')" id="btn-mode-stopwatch" class="px-4 py-2 rounded-lg font-label-caps font-bold transition-all text-paper-base hover:bg-paper-base/15">
+                        STOPWATCH
+                    </button>
+                </div>
+
+                <!-- Custom Timer inputs if in Timer Mode -->
+                <div id="custom-timer-settings" class="hidden mb-6 flex items-center gap-2 bg-paper-base/10 p-3 rounded-xl border border-paper-base/20 select-none">
+                    <div class="w-16">
+                        <label class="block text-[9px] font-label-caps opacity-80 mb-0.5">Hours</label>
+                        <input type="number" id="input-custom-hours" min="0" max="23" value="0" class="w-full text-center text-xs bg-background border-none rounded text-ink-deep font-bold py-1">
+                    </div>
+                    <span class="text-xl font-bold">:</span>
+                    <div class="w-16">
+                        <label class="block text-[9px] font-label-caps opacity-80 mb-0.5">Minutes</label>
+                        <input type="number" id="input-custom-minutes" min="0" max="59" value="25" class="w-full text-center text-xs bg-background border-none rounded text-ink-deep font-bold py-1">
+                    </div>
+                    <button onclick="applyCustomDuration()" class="bg-terracotta-accent text-ink-deep text-[10px] font-bold px-3 py-2.5 rounded-lg ml-2 hover:scale-105 transition-all">SET</button>
+                </div>
+
+                <!-- Pomodoro customizer if in Pomodoro Mode -->
+                <div id="pomodoro-timer-settings" class="hidden mb-6 flex items-center gap-2 bg-paper-base/10 p-3 rounded-xl border border-paper-base/20 select-none text-xs">
+                    <div>
+                        <label class="block text-[9px] font-label-caps opacity-80 mb-0.5">Work (min)</label>
+                        <input type="number" id="input-pomodoro-work" min="1" max="120" value="{{ timer_work_minutes }}" class="w-16 text-center text-xs bg-background border-none rounded text-ink-deep font-bold py-1">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-label-caps opacity-80 mb-0.5">Break (min)</label>
+                        <input type="number" id="input-pomodoro-break" min="1" max="60" value="{{ timer_break_minutes }}" class="w-16 text-center text-xs bg-background border-none rounded text-ink-deep font-bold py-1">
+                    </div>
+                    <button onclick="applyPomodoroTimes()" class="bg-terracotta-accent text-ink-deep text-[10px] font-bold px-3 py-2.5 rounded-lg hover:scale-105 transition-all">APPLY</button>
+                </div>
+
+                <!-- Timer SVG circle -->
+                <div class="relative w-56 h-56 flex items-center justify-center select-none mb-4">
+                    <svg class="w-full h-full -rotate-90">
+                        <circle class="text-paper-base/10" cx="112" cy="112" fill="transparent" r="102" stroke="currentColor" stroke-width="4"></circle>
+                        <circle cx="112" cy="112" fill="transparent" r="102" id="timer-progress-ring"
+                                stroke="#D48C70" 
+                                stroke-linecap="round" stroke-width="8" stroke-dasharray="640.88" 
+                                stroke-dashoffset="0" class="transition-all duration-300"></circle>
+                    </svg>
+                    <span class="absolute text-5xl font-extrabold tracking-tighter text-paper-base" id="timer-text-display">25:00</span>
+                </div>
+                
+                <p class="text-xs opacity-75 font-semibold uppercase tracking-wider select-none mb-6" id="timer-label-sub">
+                    POMODORO: WORK INTERVAL
+                </p>
+
+                <!-- Controls -->
+                <div class="flex gap-4 select-none">
+                    <button onclick="toggleTimer()" id="btn-timer-toggle" class="bg-terracotta-accent text-ink-deep px-8 py-3 rounded-full font-label-caps text-label-caps font-bold hover:scale-105 active:scale-95 transition-all">
+                        START
+                    </button>
+                    <button onclick="resetTimer()" class="border border-paper-base/30 text-paper-base px-6 py-3 rounded-full font-label-caps text-label-caps hover:bg-paper-base/10 active:scale-95 transition-all">
+                        RESET
+                    </button>
+                    <button onclick="recordStopwatchLap()" id="btn-timer-lap" class="hidden border border-paper-base/30 text-paper-base px-6 py-3 rounded-full font-label-caps text-label-caps hover:bg-paper-base/10 active:scale-95 transition-all">
+                        LAP
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stopwatch Lap History -->
+        <div id="stopwatch-lap-container" class="hidden w-full max-w-lg mt-4 paper-card p-4 rounded-xl bg-paper-base">
+            <h4 class="text-xs font-label-caps text-ink-deep border-b border-outline-variant pb-2 mb-2 font-bold uppercase tracking-wider">Stopwatch Laps</h4>
+            <div class="space-y-1 text-xs max-h-40 overflow-y-auto custom-scrollbar" id="stopwatch-laps-list">
+                <!-- Laps added via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column (Stats & Heatmap) -->
+    <div class="md:col-span-4 space-y-gutter">
+        
+        <!-- Focus Stats -->
+        <div class="paper-card rounded-xl p-stack-md">
+            <h3 class="font-headline-md text-headline-md text-ink-deep mb-4">Focus Statistics</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-surface-container rounded-lg p-3 border border-outline-variant/60 text-center">
+                    <div class="text-[9px] font-label-caps text-on-surface-variant font-bold uppercase tracking-wider">TODAY'S WORK</div>
+                    <div class="text-2xl font-bold text-ink-deep mt-1" id="stat-hours-today">{{ "%.1f"|format(profile.focus_hours_today) }}h</div>
+                </div>
+                <div class="bg-surface-container rounded-lg p-3 border border-outline-variant/60 text-center">
+                    <div class="text-[9px] font-label-caps text-on-surface-variant font-bold uppercase tracking-wider">TOTAL WORK</div>
+                    <div class="text-2xl font-bold text-ink-deep mt-1" id="stat-hours-total">{{ "%.1f"|format(profile.focus_hours_total) }}h</div>
+                </div>
+                <div class="bg-surface-container rounded-lg p-3 border border-outline-variant/60 text-center">
+                    <div class="text-[9px] font-label-caps text-on-surface-variant font-bold uppercase tracking-wider">SESSIONS</div>
+                    <div class="text-2xl font-bold text-ink-deep mt-1" id="stat-sessions">{{ focus_sessions|length }}</div>
+                </div>
+                <div class="bg-secondary-container/20 border border-terracotta-accent/30 rounded-lg p-3 text-center">
+                    <div class="text-[9px] font-label-caps text-terracotta-accent font-bold uppercase tracking-wider">ACTIVE STREAK</div>
+                    <div class="text-2xl font-bold text-terracotta-accent mt-1" id="stat-streak">{{ streak_count }} Days</div>
+                </div>
+            </div>
+
+            <!-- Heatmap Grid -->
+            <div class="mt-6 border-t border-outline-variant pt-4 select-none">
+                <h4 class="font-label-caps text-[10px] text-on-surface-variant mb-3 text-center uppercase tracking-widest font-semibold">Your Study Heatmap</h4>
+                <div class="text-xs text-ink-deep font-bold text-center mb-3">{{ month_label }}</div>
+                
+                <div class="grid grid-cols-7 gap-1.5 max-w-[240px] mx-auto text-[9px] text-center">
+                    <div class="font-bold opacity-60">S</div>
+                    <div class="font-bold opacity-60">M</div>
+                    <div class="font-bold opacity-60">T</div>
+                    <div class="font-bold opacity-60">W</div>
+                    <div class="font-bold opacity-60">T</div>
+                    <div class="font-bold opacity-60">F</div>
+                    <div class="font-bold opacity-60">S</div>
+                    
+                    {% for i in range(first_day_idx) %}
+                    <div class="w-6 h-6"></div>
+                    {% endfor %}
+                    
+                    {% for day in range(1, days_in_month + 1) %}
+                    <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px]
+                         {% if day in active_heatmap_days %}
+                         bg-terracotta-accent text-white font-bold shadow-sm
+                         {% else %}
+                         bg-paper-base/30 text-ink-deep border border-outline-variant/30
+                         {% endif %}" id="heatmap-day-{{ day }}">
+                        {{ day }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Sound alarm audio cache placeholder -->
+<audio id="timer-alarm-audio" src="{{ play_beep_data_uri }}" preload="auto"></audio>
+
+<script>
+    // JS STATE CONTROLLER USING LOCAL STORAGE SYNC
+    let timerState = {
+        mode: "pomodoro",
+        status: "paused",
+        type: "work",
+        duration: 1500,
+        secondsRemaining: 1500,
+        lastUpdate: Date.now(),
+        workMinutes: 25,
+        breakMinutes: 5,
+        customMinutes: 25,
+        stopwatchSeconds: 0
+    };
+    
+    let tickerInterval = null;
+
+    document.addEventListener("DOMContentLoaded", function() {
+        // Load initial state
+        const saved = localStorage.getItem("uniflow_timer");
+        if (saved) {
+            timerState = JSON.parse(saved);
+            
+            // Adjust work/break defaults if they differ from the backend settings values
+            const backendWork = parseInt("{{ timer_work_minutes }}") || 25;
+            const backendBreak = parseInt("{{ timer_break_minutes }}") || 5;
+            if (timerState.workMinutes !== backendWork || timerState.breakMinutes !== backendBreak) {
+                timerState.workMinutes = backendWork;
+                timerState.breakMinutes = backendBreak;
+                if (timerState.mode === "pomodoro" && timerState.status === "paused") {
+                    timerState.secondsRemaining = timerState.type === "work" ? backendWork * 60 : backendBreak * 60;
+                    timerState.duration = timerState.secondsRemaining;
+                }
+            }
+            
+            // If it was running, calculate elapsed time
+            if (timerState.status === "running") {
+                const elapsed = Math.floor((Date.now() - timerState.lastUpdate) / 1000);
+                if (timerState.mode === "stopwatch") {
+                    timerState.stopwatchSeconds += elapsed;
+                } else {
+                    timerState.secondsRemaining = Math.max(0, timerState.secondsRemaining - elapsed);
+                }
+                timerState.lastUpdate = Date.now();
+                tickerInterval = setInterval(tick, 1000);
+            }
+        } else {
+            // Write default from backend values
+            timerState.mode = "{{ timer_mode }}";
+            timerState.workMinutes = parseInt("{{ timer_work_minutes }}") || 25;
+            timerState.breakMinutes = parseInt("{{ timer_break_minutes }}") || 5;
+            timerState.customMinutes = parseInt("{{ timer_custom_minutes }}") || 25;
+            timerState.secondsRemaining = timerState.workMinutes * 60;
+            timerState.duration = timerState.workMinutes * 60;
+            localStorage.setItem("uniflow_timer", JSON.stringify(timerState));
+        }
+
+        updateTimerDisplay();
+        
+        // Populate inputs values in forms
+        document.getElementById("input-custom-minutes").value = timerState.customMinutes % 60;
+        document.getElementById("input-custom-hours").value = Math.floor(timerState.customMinutes / 60);
+        document.getElementById("input-pomodoro-work").value = timerState.workMinutes;
+        document.getElementById("input-pomodoro-break").value = timerState.breakMinutes;
+    });
+
+    function playBeep() {
+        const audio = document.getElementById("timer-alarm-audio");
+        if (audio) {
+            audio.play().catch(e => {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.5, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.5);
+                } catch(err){}
+            });
+        }
+    }
+
+    function saveTimerState() {
+        timerState.lastUpdate = Date.now();
+        localStorage.setItem("uniflow_timer", JSON.stringify(timerState));
+    }
+
+    function setTimerMode(mode) {
+        if (timerState.status === "running") {
+            toggleTimer(); // pause
+        }
+        
+        timerState.mode = mode;
+        timerState.status = "paused";
+        
+        document.getElementById("pomodoro-timer-settings").classList.add("hidden");
+        document.getElementById("custom-timer-settings").classList.add("hidden");
+        document.getElementById("btn-timer-lap").classList.add("hidden");
+        document.getElementById("stopwatch-lap-container").classList.add("hidden");
+
+        if (mode === "pomodoro") {
+            document.getElementById("pomodoro-timer-settings").classList.remove("hidden");
+            timerState.type = "work";
+            timerState.secondsRemaining = timerState.workMinutes * 60;
+            timerState.duration = timerState.workMinutes * 60;
+        } else if (mode === "timer") {
+            document.getElementById("custom-timer-settings").classList.remove("hidden");
+            timerState.secondsRemaining = timerState.customMinutes * 60;
+            timerState.duration = timerState.customMinutes * 60;
+        } else {
+            document.getElementById("btn-timer-lap").classList.remove("hidden");
+            document.getElementById("stopwatch-lap-container").classList.remove("hidden");
+            timerState.stopwatchSeconds = 0;
+            lapHistory = [];
+            document.getElementById("stopwatch-laps-list").innerHTML = "";
+        }
+        
+        saveTimerState();
+        updateTimerDisplay();
+    }
+
+    function toggleTimer() {
+        if (timerState.status === "paused") {
+            timerState.status = "running";
+            timerState.lastUpdate = Date.now();
+            tickerInterval = setInterval(tick, 1000);
+        } else {
+            timerState.status = "paused";
+            clearInterval(tickerInterval);
+        }
+        saveTimerState();
+        updateTimerDisplay();
+    }
+
+    function resetTimer() {
+        if (timerState.status === "running") {
+            toggleTimer();
+        }
+        
+        if (timerState.mode === "pomodoro") {
+            timerState.type = "work";
+            timerState.secondsRemaining = timerState.workMinutes * 60;
+            timerState.duration = timerState.workMinutes * 60;
+        } else if (timerState.mode === "timer") {
+            timerState.secondsRemaining = timerState.customMinutes * 60;
+            timerState.duration = timerState.customMinutes * 60;
+        } else {
+            timerState.stopwatchSeconds = 0;
+            lapHistory = [];
+            document.getElementById("stopwatch-laps-list").innerHTML = "";
+        }
+        saveTimerState();
+        updateTimerDisplay();
+    }
+
+    function applyCustomDuration() {
+        const hrs = parseInt(document.getElementById("input-custom-hours").value) || 0;
+        const mins = parseInt(document.getElementById("input-custom-minutes").value) || 0;
+        timerState.customMinutes = hrs * 60 + mins;
+        if (timerState.customMinutes < 1) timerState.customMinutes = 1;
+        
+        timerState.secondsRemaining = timerState.customMinutes * 60;
+        timerState.duration = timerState.customMinutes * 60;
+        saveTimerState();
+        updateTimerDisplay();
+    }
+
+    function applyPomodoroTimes() {
+        const work = parseInt(document.getElementById("input-pomodoro-work").value) || 25;
+        const breakVal = parseInt(document.getElementById("input-pomodoro-break").value) || 5;
+        
+        timerState.workMinutes = work;
+        timerState.breakMinutes = breakVal;
+        
+        timerState.type = "work";
+        timerState.secondsRemaining = work * 60;
+        timerState.duration = work * 60;
+        
+        // Post to backend to save these user values permanently in sessions
+        fetch("/focus/set-pomodoro-times", {
+            method: "POST",
+            body: new URLSearchParams({ work_min: work, break_min: breakVal })
+        });
+
+        saveTimerState();
+        updateTimerDisplay();
+    }
+
+    function recordStopwatchLap() {
+        if (timerState.mode !== "stopwatch") return;
+        
+        const lapTime = formatSecs(timerState.stopwatchSeconds);
+        lapHistory.push(lapTime);
+        
+        const list = document.getElementById("stopwatch-laps-list");
+        const idx = lapHistory.length;
+        list.innerHTML = `
+            <div class="flex justify-between py-1 border-b border-outline-variant/30 last:border-b-0">
+                <span class="text-on-surface-variant">Lap ${idx}</span>
+                <span class="font-bold text-ink-deep">${lapTime}</span>
+            </div>
+        ` + list.innerHTML;
+    }
+
+    function tick() {
+        if (timerState.mode === "stopwatch") {
+            timerState.stopwatchSeconds++;
+        } else {
+            timerState.secondsRemaining--;
+            
+            if (timerState.secondsRemaining <= 0) {
+                playBeep();
+                
+                if (timerState.mode === "pomodoro") {
+                    if (timerState.type === "work") {
+                        logFocusSession(timerState.workMinutes, "work");
+                        timerState.type = "break";
+                        timerState.secondsRemaining = timerState.breakMinutes * 60;
+                        timerState.duration = timerState.breakMinutes * 60;
+                        alert("Pomodoro Work complete! Short break started.");
+                    } else {
+                        logFocusSession(timerState.breakMinutes, "break");
+                        timerState.type = "work";
+                        timerState.secondsRemaining = timerState.workMinutes * 60;
+                        timerState.duration = timerState.workMinutes * 60;
+                        alert("Break complete! Back to work.");
+                    }
+                } else {
+                    logFocusSession(timerState.customMinutes, "timer");
+                    toggleTimer(); // pause
+                    timerState.secondsRemaining = timerState.customMinutes * 60;
+                    alert("Timer countdown complete!");
+                }
+            }
+        }
+        saveTimerState();
+        updateTimerDisplay();
+    }
+
+    function logFocusSession(duration, type) {
+        fetch("/api/focus/log", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ duration: duration, type: type })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById("stat-streak").innerText = data.streak + " Days";
+                document.getElementById("stat-hours-today").innerText = data.focus_hours_today.toFixed(1) + "h";
+                document.getElementById("stat-hours-total").innerText = data.focus_hours_total.toFixed(1) + "h";
+                
+                const sNode = document.getElementById("stat-sessions");
+                sNode.innerText = parseInt(sNode.innerText) + 1;
+                
+                const dayNum = new Date().getDate();
+                const cell = document.getElementById("heatmap-day-" + dayNum);
+                if (cell) {
+                    cell.className = "w-6 h-6 rounded-full flex items-center justify-center text-[10px] bg-terracotta-accent text-white font-bold shadow-sm";
+                }
+            }
+        })
+        .catch(err => console.log(err));
+    }
+
+    function formatSecs(t) {
+        const mins = Math.floor(t / 60);
+        const secs = t % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplay() {
+        const ring = document.getElementById("timer-progress-ring");
+        const display = document.getElementById("timer-text-display");
+        const label = document.getElementById("timer-label-sub");
+        const btnToggle = document.getElementById("btn-timer-toggle");
+
+        // Toggle active mode header styling
+        document.getElementById("btn-mode-pomodoro").className = "px-4 py-2 rounded-lg font-label-caps font-bold transition-all text-paper-base hover:bg-paper-base/15";
+        document.getElementById("btn-mode-timer").className = "px-4 py-2 rounded-lg font-label-caps font-bold transition-all text-paper-base hover:bg-paper-base/15";
+        document.getElementById("btn-mode-stopwatch").className = "px-4 py-2 rounded-lg font-label-caps font-bold transition-all text-paper-base hover:bg-paper-base/15";
+
+        document.getElementById("btn-mode-" + timerState.mode).className = "px-4 py-2 rounded-lg font-label-caps font-bold transition-all bg-terracotta-accent text-ink-deep";
+
+        if (timerState.status === "running") {
+            btnToggle.innerText = "PAUSE";
+            btnToggle.className = "bg-error text-white px-8 py-3 rounded-full font-label-caps text-label-caps font-bold hover:scale-105 active:scale-95 transition-all";
+        } else {
+            btnToggle.innerText = "START";
+            btnToggle.className = "bg-terracotta-accent text-ink-deep px-8 py-3 rounded-full font-label-caps text-label-caps font-bold hover:scale-105 active:scale-95 transition-all";
+        }
+
+        if (timerState.mode === "stopwatch") {
+            display.innerText = formatSecs(timerState.stopwatchSeconds);
+            label.innerText = "STOPWATCH RUNNING";
+            ring.setAttribute("stroke-dashoffset", "640.88");
+            ring.setAttribute("stroke", "#C9A15B");
+        } else {
+            display.innerText = formatSecs(timerState.secondsRemaining);
+            
+            const pct = timerState.secondsRemaining / timerState.duration;
+            const offset = 640.88 - (pct * 640.88);
+            ring.setAttribute("stroke-dashoffset", offset);
+
+            if (timerState.mode === "pomodoro") {
+                label.innerText = `POMODORO: ${timerState.type.toUpperCase()} INTERVAL`;
+                ring.setAttribute("stroke", timerState.type === "break" ? "#C9A15B" : "#D48C70");
+            } else {
+                label.innerText = "COUNTDOWN TIMER";
+                ring.setAttribute("stroke", "#D48C70");
+            }
+        }
+        
+        document.title = `(${display.innerText}) UniFlow Focus`;
+    }
+</script>
+{% endblock %}
