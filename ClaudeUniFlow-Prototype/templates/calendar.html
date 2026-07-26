@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <p class="mono muted" style="font-size:0.82rem; margin:0 0 4px;">Now showing</p>
+    <h1 style="font-size:clamp(2rem,5vw,2.8rem); font-weight:700; line-height:1.1;">{{ context.now.strftime('%A, %d %B %Y') }}</h1>
+  </div>
+  <div class="view-switcher">
+    <a href="{{ url_for('calendar', view='day') }}" class="chip {% if context.mode == 'day' %}active{% endif %}">Day</a>
+    <a href="{{ url_for('calendar', view='week') }}" class="chip {% if context.mode == 'week' %}active{% endif %}">Week</a>
+    <a href="{{ url_for('calendar', view='month') }}" class="chip {% if context.mode == 'month' %}active{% endif %}">Month</a>
+    <a href="{{ url_for('calendar', view='year') }}" class="chip {% if context.mode == 'year' %}active{% endif %}">Year</a>
+  </div>
+</div>
+
+<div class="card mb-6">
+  <div class="calendar-header">
+    <div class="calendar-now">{{ context.now.strftime('%I:%M %p') }}</div>
+    <div class="calendar-mode">{{ context.mode|capitalize }} view</div>
+  </div>
+
+  {% if context.mode == 'day' %}
+    <div class="day-grid">
+      {% for day in context.dates %}
+        <div class="day-panel">
+          <div class="day-date">{{ day.strftime('%A') }}</div>
+          <div class="day-number">{{ day.day }}</div>
+          {% for event in context.events.get(day, []) %}
+            <div class="event-pill">{{ event.title }}</div>
+          {% else %}
+            <div class="event-empty">No tasks</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  {% elif context.mode == 'week' %}
+    <div class="week-grid">
+      {% for day in context.dates %}
+        <div class="week-card">
+          <div class="week-title">{{ day.strftime('%a') }}</div>
+          <div class="week-number">{{ day.day }}</div>
+          {% for event in context.events.get(day, []) %}
+            <div class="event-pill">{{ event.title }}</div>
+          {% else %}
+            <div class="event-empty">Free</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  {% elif context.mode == 'year' %}
+    <div class="year-grid">
+      {% for month in context.dates %}
+        <div class="year-card">
+          <div class="week-title">{{ month.strftime('%B') }}</div>
+          <div class="event-empty">{{ month.year }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="month-grid">
+      {% for day in context.dates %}
+        <div class="month-card">
+          <div class="week-number">{{ day.day }}</div>
+          {% for event in context.events.get(day, []) %}
+            <div class="event-pill">{{ event.title }}</div>
+          {% else %}
+            <div class="event-empty">No tasks</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

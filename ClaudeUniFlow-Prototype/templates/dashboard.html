@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- ── Top row: greeting + streak ─────────────────────────────────────────── -->
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+  <div>
+    <p class="mono muted" style="font-size:0.82rem; margin:0 0 4px;">{{ greeting }},</p>
+    <h1 style="font-size:clamp(2.2rem,6vw,3.2rem); font-weight:700; line-height:1.1;">
+      Hi, {{ user.name or 'Student' }}!
+    </h1>
+    <p class="muted mt-4" style="font-size:0.95rem;">
+      {% if user.streak == 0 %}Start a session today to begin your streak!
+      {% else %}Keep going — you're on a roll! 🎉
+      {% endif %}
+    </p>
+  </div>
+  <div class="streak-badge">
+    <!-- flame icon -->
+    <svg width="22" height="22" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg>
+    <span class="num" id="streakCount">{{ user.streak }}</span>
+    <span class="label">day streak</span>
+  </div>
+</div>
+
+<!-- ── Quote ───────────────────────────────────────────────────────────────── -->
+<div class="quote-box">
+  <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></svg>
+  <div style="flex:1;">
+    <p class="quote-text" id="quoteText">The secret of getting ahead is getting started.</p>
+    <p class="quote-author" id="quoteAuthor">— Mark Twain</p>
+  </div>
+  <button class="quote-refresh" onclick="nextQuote()" title="New quote">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+  </button>
+</div>
+
+<div id="statsData"
+     data-today-mins="{{ stats.today_mins }}"
+     data-today-sessions="{{ stats.today_sessions }}"
+     data-all-mins="{{ stats.all_mins }}"
+     data-all-sessions="{{ stats.all_sessions }}"
+     style="display:none;"></div>
+
+<!-- ── Study timer card ────────────────────────────────────────────────────── -->
+<div class="card mb-8">
+  <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <svg width="20" height="20" fill="none" stroke="var(--amber)" stroke-width="2"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>
+        <h2 style="font-size:1.3rem;">Study timer</h2>
+      </div>
+      <p class="muted mt-4" style="font-size:0.85rem;">Track any study session and save it to your history.</p>
+    </div>
+    <div class="timer-status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusLabel">Idle</span>
+    </div>
+  </div>
+
+  <div class="timer-display" id="timerDisplay">00:00</div>
+  <p class="timer-hint" id="timerHint">Press start when you begin studying</p>
+
+  <div class="timer-btns mt-6">
+    <button class="btn btn-amber" id="startBtn" onclick="startTimer()">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
+      Start
+    </button>
+    <button class="btn btn-teal" id="stopBtn" onclick="stopTimer()" disabled>
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+      Stop &amp; save
+    </button>
+    <button class="btn btn-outline" onclick="resetTimer()" title="Reset without saving">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Reset
+    </button>
+  </div>
+
+  <div class="session-strip">
+    <div class="card-inner">
+      <div class="strip-label">
+        <svg width="14" height="14" fill="none" stroke="var(--amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Today's total
+      </div>
+      <div class="big" id="todayTotal">0m</div>
+      <div class="tiny" id="todaySessions">0 sessions saved today</div>
+    </div>
+    <div class="card-inner">
+      <div class="strip-label">
+        <svg width="14" height="14" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8"/></svg>
+        All-time total
+      </div>
+      <div class="big" id="allTimeTotal">0h 0m</div>
+      <div class="tiny" id="allTimeSessions">0 sessions saved overall</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stats grid ──────────────────────────────────────────────────────────── -->
+<div class="stats-grid">
+  <div class="card stat-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></svg></div>
+    <div class="lbl">Active Tasks</div>
+    <div class="num">{{ stats.active_tasks }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div>
+    <div class="lbl">Completed</div>
+    <div class="num">{{ stats.completed_tasks }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></div>
+    <div class="lbl">Study Today</div>
+    <div class="num">{{ stats.today_mins }}m</div>
+  </div>
+  <div class="card stat-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg></div>
+    <div class="lbl">Subjects</div>
+    <div class="num">{{ stats.all_sessions }}</div>
+  </div>
+</div>
+
+<!-- ── Quick access ────────────────────────────────────────────────────────── -->
+<div class="section-hd">
+  <h2>Quick access</h2>
+</div>
+<div class="quick-grid mb-8">
+  <a href="/tasks" class="quick-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></svg></div>
+    <div class="title">Tasks</div>
+    <div class="sub">Manage your to-dos</div>
+  </a>
+  <a href="/calendar" class="quick-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg></div>
+    <div class="title">Calendar</div>
+    <div class="sub">Plan your schedule</div>
+  </a>
+  <a href="/focus" class="quick-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></div>
+    <div class="title">Focus</div>
+    <div class="sub">Pomodoro &amp; timer</div>
+  </a>
+  <a href="/flashcards" class="quick-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg></div>
+    <div class="title">Cards</div>
+    <div class="sub">Study with flashcards</div>
+  </a>
+</div>
+
+<!-- ── Coming up ───────────────────────────────────────────────────────────── -->
+<div class="section-hd">
+  <h2>Coming up</h2>
+</div>
+<div class="card">
+  <div class="empty">
+    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>
+    No upcoming tasks. Enjoy your break!
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ── Quotes ────────────────────────────────────────────────────────────────
+  const quotes = [
+    { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+    { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+    { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+    { text: "You don't have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
+    { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+    { text: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
+    { text: "The harder you work for something, the greater you'll feel when you achieve it.", author: "Unknown" },
+    { text: "Push yourself, because no one else is going to do it for you.", author: "Unknown" },
+  ];
+  let qi = 0;
+  function nextQuote() {
+    qi = (qi + 1) % quotes.length;
+    document.getElementById("quoteText").textContent = quotes[qi].text;
+    document.getElementById("quoteAuthor").textContent = "— " + quotes[qi].author;
+  }
+  qi = Math.floor(Math.random() * quotes.length);
+  nextQuote(); nextQuote();
+
+  // ── Stopwatch ─────────────────────────────────────────────────────────────
+  let running = false, elapsed = 0, interval = null;
+  const statsData = document.getElementById('statsData');
+  let todayMins = Number(statsData.dataset.todayMins) || 0;
+  let todaySess = Number(statsData.dataset.todaySessions) || 0;
+  let allMins = Number(statsData.dataset.allMins) || 0;
+  let allSess = Number(statsData.dataset.allSessions) || 0;
+
+  function fmt(s) {
+    const m = Math.floor(s / 60), sec = s % 60;
+    return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  }
+
+  function renderTotals() {
+    document.getElementById('todayTotal').textContent = todayMins + 'm';
+    document.getElementById('todaySessions').textContent = todaySess + ' session' + (todaySess !== 1 ? 's' : '') + ' saved today';
+    const h = Math.floor(allMins / 60), m = allMins % 60;
+    document.getElementById('allTimeTotal').textContent = h + 'h ' + m + 'm';
+    document.getElementById('allTimeSessions').textContent = allSess + ' session' + (allSess !== 1 ? 's' : '') + ' saved overall';
+  }
+
+  function syncStats() {
+    fetch('/api/study-sessions')
+      .then(response => response.json())
+      .then(data => {
+        todayMins = data.today_mins || 0;
+        todaySess = data.today_sessions || 0;
+        allMins = data.all_mins || 0;
+        allSess = data.all_sessions || 0;
+        renderTotals();
+      });
+  }
+
+  function saveSession(durationMins) {
+    fetch('/api/study-sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration_mins: durationMins })
+    })
+      .then(response => response.json())
+      .then(data => {
+        todayMins = data.today_mins || 0;
+        todaySess = data.today_sessions || 0;
+        allMins = data.all_mins || 0;
+        allSess = data.all_sessions || 0;
+        renderTotals();
+      });
+  }
+
+  function startTimer() {
+    if (running) return;
+    running = true;
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('statusDot').classList.add('running');
+    document.getElementById('statusLabel').textContent = 'Running';
+    document.getElementById('timerHint').textContent = 'Session in progress…';
+    interval = setInterval(() => {
+      elapsed++;
+      document.getElementById('timerDisplay').textContent = fmt(elapsed);
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (!running) return;
+    clearInterval(interval);
+    running = false;
+
+    const mins = Math.max(1, Math.floor(elapsed / 60));
+    saveSession(mins);
+
+    elapsed = 0;
+    document.getElementById('timerDisplay').textContent = '00:00';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('statusDot').classList.remove('running');
+    document.getElementById('statusLabel').textContent = 'Idle';
+    document.getElementById('timerHint').textContent = 'Session saved! Press start for another.';
+  }
+
+  function resetTimer() {
+    clearInterval(interval);
+    running = false; elapsed = 0;
+    document.getElementById('timerDisplay').textContent = '00:00';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('statusDot').classList.remove('running');
+    document.getElementById('statusLabel').textContent = 'Idle';
+    document.getElementById('timerHint').textContent = 'Press start when you begin studying';
+  }
+
+  renderTotals();
+  syncStats();
+</script>
+{% endblock %}

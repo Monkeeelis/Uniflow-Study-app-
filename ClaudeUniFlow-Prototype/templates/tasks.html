@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Tasks{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <p class="mono muted" style="font-size:0.82rem; margin:0 0 4px;">Stay on top of your week</p>
+  <h1 style="font-size:clamp(2rem,5vw,2.8rem); font-weight:700; line-height:1.1;">Tasks</h1>
+</div>
+
+<div class="card mb-6">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+    <div>
+      <h2 style="font-size:1.25rem;">Today’s checklist</h2>
+      <p class="muted mt-4" style="font-size:0.85rem;">Manage your upcoming work in one place.</p>
+    </div>
+    <form method="post" class="task-form">
+      <input type="text" name="task_title" placeholder="Add a task" required>
+      <input type="date" name="task_due_date" value="{{ today }}" required>
+      <button class="btn btn-amber" type="submit">+ Add task</button>
+    </form>
+  </div>
+
+  <div class="quick-grid">
+    <div class="card-inner">
+      <div class="strip-label">Complete</div>
+      <div class="big">{{ stats.completed_tasks }}</div>
+      <div class="tiny">Tasks completed</div>
+    </div>
+    <div class="card-inner">
+      <div class="strip-label">Pending</div>
+      <div class="big">{{ stats.active_tasks }}</div>
+      <div class="tiny">Tasks remaining</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  {% if tasks %}
+    <div class="flex flex-col gap-3">
+      {% for task in tasks %}
+        <form method="post" action="{{ url_for('toggle_task', task_index=loop.index0) }}" class="card-inner flex items-center justify-between gap-3">
+          <label class="flex items-center gap-3" style="flex:1;">
+            <input type="checkbox" {% if task.done %}checked{% endif %} onchange="this.form.submit()">
+            <span {% if task.done %}style="text-decoration: line-through; color: var(--brown-mid);"{% endif %}>{{ task.title }}</span>
+          </label>
+          <div class="task-meta">
+            <span class="mono muted" style="font-size:0.72rem;">{{ task.due_date }}</span>
+            <span class="mono muted" style="font-size:0.72rem;">{% if task.done %}Done{% else %}Open{% endif %}</span>
+          </div>
+        </form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2v4"/><path d="M13 18v4"/><path d="M4 8h18"/><path d="M7 8a1 1 0 0 0-1 1v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9a1 1 0 0 0-1-1"/><path d="M9 13h8"/><path d="M9 17h6"/></svg>
+      Add your first task to get started.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

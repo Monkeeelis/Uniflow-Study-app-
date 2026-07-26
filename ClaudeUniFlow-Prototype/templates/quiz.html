@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Cards{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <p class="mono muted" style="font-size:0.82rem; margin:0 0 4px;">Study smarter</p>
+  <h1 style="font-size:clamp(2rem,5vw,2.8rem); font-weight:700; line-height:1.1;">Cards</h1>
+</div>
+
+<div class="card mb-6">
+  <div class="quote-box" style="margin-bottom:0;">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+    <div style="flex:1;">
+      <p class="quote-text">What is the main idea of your current topic?</p>
+      <p class="quote-author">Flashcards ready for revision</p>
+    </div>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card stat-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg></div>
+    <div class="lbl">Decks</div>
+    <div class="num">3</div>
+  </div>
+  <div class="card stat-card">
+    <div class="icon-box"><svg width="22" height="22" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div>
+    <div class="lbl">Mastered</div>
+    <div class="num">11</div>
+  </div>
+</div>
+{% endblock %}
