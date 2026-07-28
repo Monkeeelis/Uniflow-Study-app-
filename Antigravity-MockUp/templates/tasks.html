@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-[0.35em] text-ink-deep/70 font-semibold">Tasks</p>
+            <h1 class="mt-3 text-4xl font-black text-ink-deep">Your to-do board</h1>
+            <p class="mt-3 text-sm text-on-surface-variant">Use the list below to track study tasks, due dates, and completion status.</p>
+        </div>
+        <a href="/home" class="px-5 py-3 rounded-3xl bg-ink-deep text-paper-base font-semibold text-sm hover:bg-opacity-95 transition-all">Back to dashboard</a>
+    </div>
+
+    <div class="paper-card rounded-3xl border border-outline-variant p-6 shadow-sm">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-lg font-bold text-ink-deep">Task list</h2>
+                <p class="text-sm text-on-surface-variant">Organize tasks by due date and category to stay focused.</p>
+            </div>
+            <a href="/calendar" class="inline-flex items-center gap-2 rounded-3xl border border-outline-variant bg-paper-base px-4 py-2 text-sm font-semibold text-ink-deep transition hover:bg-surface-container-low">View calendar</a>
+        </div>
+
+        <div class="mt-6 space-y-4">
+            {% if todos %}
+                {% for todo in todos %}
+                <div class="paper-card rounded-3xl border border-outline-variant p-5 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="w-3.5 h-3.5 rounded-full" style="background-color: {{ todo.color }}"></span>
+                        <div>
+                            <p class="text-base font-semibold text-ink-deep {{ 'line-through opacity-60' if todo.completed }}">{{ todo.title }}</p>
+                            <p class="text-xs text-on-surface-variant">{{ todo.category }} • {{ todo.date }} at {{ todo.time }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <form action="/todo/toggle/{{ todo.id }}?redirect=tasks" method="POST" class="inline">
+                            <button type="submit" class="rounded-full border border-outline-variant bg-paper-base px-4 py-2 text-sm font-semibold text-ink-deep hover:bg-surface-container-low transition-all">
+                                {% if todo.completed %}Mark Incomplete{% else %}Complete{% endif %}
+                            </button>
+                        </form>
+                        <form action="/todo/delete/{{ todo.id }}?redirect=tasks" method="POST" class="inline">
+                            <button type="submit" class="rounded-full border border-outline-variant bg-transparent px-4 py-2 text-sm font-semibold text-error hover:bg-error/10 transition-all">Delete</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="rounded-3xl border border-dashed border-outline-variant bg-paper-base px-6 py-10 text-center text-sm text-on-surface-variant">
+                    No tasks yet. Add a task from the calendar or refresh after creating one.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

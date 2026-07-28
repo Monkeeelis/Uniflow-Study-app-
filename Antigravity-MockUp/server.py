@@ -198,20 +198,29 @@ def inject_global_vars():
 
 @app.route('/')
 def root():
+    if 'user_name' not in session:
+        return redirect(url_for('login_route'))
     return redirect(url_for('home_route'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login_route():
+    if 'user_name' in session:
+        return redirect(url_for('home_route'))
+
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         if name:
             session['user_name'] = name
             
-            # Check if profile exists, otherwise create
+            # Check if profile exists, otherwise create and mark onboarded so login goes directly to home
             conn = get_db_connection()
             profile = conn.execute("SELECT * FROM profile WHERE name = ?", (name,)).fetchone()
-            if not profile:
-                conn.execute("INSERT INTO profile (name, year_level, onboarded) VALUES (?, ?, 0)", (name, "College Freshman"))
+            if profile:
+                if not profile['onboarded']:
+                    conn.execute("UPDATE profile SET onboarded = 1 WHERE name = ?", (name,))
+                    conn.commit()
+            else:
+                conn.execute("INSERT INTO profile (name, year_level, onboarded) VALUES (?, ?, 1)", (name, "College Freshman"))
                 conn.commit()
             conn.close()
             
@@ -364,6 +373,28 @@ def home_route():
         timer_display=timer_settings['timer_display'],
         timer_svg_offset=timer_settings['svg_offset']
     )
+
+@app.route('/tasks')
+def tasks_route():
+    conn = get_db_connection()
+    todos_raw = conn.execute("SELECT * FROM todos ORDER BY date, time").fetchall()
+    subjects = conn.execute("SELECT * FROM subjects").fetchall()
+    subjects_dict = {s['name'].lower(): s['color'] for s in subjects}
+    conn.close()
+
+    todos = []
+    for td in todos_raw:
+        todos.append({
+            "id": td['id'],
+            "title": td['title'],
+            "category": td['category'],
+            "date": td['date'],
+            "time": td['time'],
+            "completed": bool(td['completed']),
+            "color": subjects_dict.get(td['category'].lower(), "#5A3E22")
+        })
+
+    return render_template("tasks.html", active_view="tasks", todos=todos)
 
 @app.route('/calendar')
 def calendar_route():
@@ -531,7 +562,7 @@ def edit_event():
 @app.route('/todo/add', methods=['POST'])
 def add_todo():
     title = request.form.get('title')
-    category = request.form.get('category').strip()
+    category = request.form.get('category', '').strip()
     date = request.form.get('date')
     todo_time = request.form.get('time')
     redirect_to = request.args.get('redirect', 'home')
@@ -547,7 +578,11 @@ def add_todo():
     conn.commit()
     conn.close()
     
-    return redirect(url_for('home_route') if redirect_to == 'home' else url_for('calendar_route'))
+    if redirect_to == 'calendar':
+        return redirect(url_for('calendar_route'))
+    if redirect_to == 'tasks':
+        return redirect(url_for('tasks_route'))
+    return redirect(url_for('home_route'))
 
 @app.route('/todo/toggle/<todo_id>', methods=['POST'])
 def toggle_todo(todo_id):
@@ -559,7 +594,11 @@ def toggle_todo(todo_id):
         conn.execute("UPDATE todos SET completed = ? WHERE id = ?", (new_val, todo_id))
         conn.commit()
     conn.close()
-    return redirect(url_for('home_route') if redirect_to == 'home' else url_for('calendar_route'))
+    if redirect_to == 'calendar':
+        return redirect(url_for('calendar_route'))
+    if redirect_to == 'tasks':
+        return redirect(url_for('tasks_route'))
+    return redirect(url_for('home_route'))
 
 @app.route('/todo/delete/<todo_id>', methods=['POST'])
 def delete_todo(todo_id):
@@ -568,143 +607,17 @@ def delete_todo(todo_id):
     conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
     conn.commit()
     conn.close()
-    return redirect(url_for('home_route') if redirect_to == 'home' else url_for('calendar_route'))
+    if redirect_to == 'calendar':
+        return redirect(url_for('calendar_route'))
+    if redirect_to == 'tasks':
+        return redirect(url_for('tasks_route'))
+    return redirect(url_for('home_route'))
 
 # --- AI CHAT, NOTEBOOK & INTEGRATION ---
 
 @app.route('/chat')
 def chat_route():
-    channel = request.args.get('channel', 'general')
-    
-    conn = get_db_connection()
-    subjects = conn.execute("SELECT * FROM subjects").fetchall()
-    messages_raw = conn.execute("SELECT * FROM chat_messages WHERE channel = ? ORDER BY id ASC LIMIT 50", (channel,)).fetchall()
-    conn.close()
-
-    messages = [{"sender": m['sender'], "text": m['text']} for m in messages_raw]
-    
-    channel_name = channel
-    for s in subjects:
-        if s['name'].lower().replace(' ', '-') == channel:
-            channel_name = f"{s['name'].lower()}-study"
-            break
-
-    # Get API Key from profile
-    user_name = session.get('user_name')
-    conn = get_db_connection()
-    profile = conn.execute("SELECT api_key FROM profile WHERE name = ?", (user_name,)).fetchone()
-    conn.close()
-    api_key_set = bool(profile['api_key'] if profile else False)
-
-    return render_template(
-        "chat.html",
-        active_view="chat",
-        active_channel=channel,
-        active_channel_name=channel_name,
-        messages=messages,
-        subjects=subjects,
-        active_pdf=session.get('pdf_name'),
-        api_key_set=api_key_set
-    )
-
-@app.route('/chat/clear-pdf', methods=['POST'])
-def clear_pdf():
-    channel = request.form.get('channel', 'general')
-    session.pop('pdf_context', None)
-    session.pop('pdf_name', None)
-    return redirect(url_for('chat_route', channel=channel))
-
-@app.route('/chat/send', methods=['GET', 'POST'])
-def chat_send():
-    channel = request.form.get('channel', 'general') if request.method == 'POST' else request.args.get('channel', 'general')
-    message = request.form.get('message', '').strip() if request.method == 'POST' else request.args.get('msg', '').strip()
-    pdf_file = request.files.get('pdf_file') if request.method == 'POST' else None
-    
-    conn = get_db_connection()
-
-    # 1. Handles PDF Upload
-    if pdf_file and pdf_file.filename:
-        try:
-            reader = PdfReader(pdf_file)
-            pdf_text = ""
-            for page in reader.pages:
-                pdf_text += page.extract_text() or ""
-            
-            session['pdf_context'] = pdf_text[:15000]
-            session['pdf_name'] = pdf_file.filename
-            
-            welcome_text = f"📁 Loaded PDF Source: *{pdf_file.filename}* ({len(pdf_text)} characters extracted). Ask me to summarize or explain concepts from this document!"
-            conn.execute("INSERT INTO chat_messages (channel, sender, text, timestamp) VALUES (?, 'ai', ?, ?)",
-                         (channel, welcome_text, time.time()))
-            conn.commit()
-        except Exception as e:
-            conn.execute("INSERT INTO chat_messages (channel, sender, text, timestamp) VALUES (?, 'ai', ?, ?)",
-                         (channel, f"❌ Error reading PDF: {str(e)}", time.time()))
-            conn.commit()
-            
-        if not message:
-            conn.close()
-            return redirect(url_for('chat_route', channel=channel))
-
-    if not message:
-        conn.close()
-        return redirect(url_for('chat_route', channel=channel))
-        
-    # Log user message
-    conn.execute("INSERT INTO chat_messages (channel, sender, text, timestamp) VALUES (?, 'user', ?, ?)",
-                 (channel, message, time.time()))
-    conn.commit()
-
-    # Get API Key
-    user_name = session.get('user_name')
-    profile = conn.execute("SELECT api_key FROM profile WHERE name = ?", (user_name,)).fetchone()
-    api_key = profile['api_key'] if profile else ""
-    if not api_key:
-        api_key = os.environ.get('GEMINI_API_KEY', "")
-
-    bot_reply = query_gemini_ai(message, channel, api_key)
-    
-    # Save bot response
-    conn.execute("INSERT INTO chat_messages (channel, sender, text, timestamp) VALUES (?, 'ai', ?, ?)",
-                 (channel, bot_reply, time.time()))
-    conn.commit()
-    conn.close()
-    
-    return redirect(url_for('chat_route', channel=channel))
-
-def query_gemini_ai(prompt, channel, api_key):
-    sys_prompt = "You are a friendly study buddy AI named UniFlow Buddy. Help the user study academic topics."
-    if channel != 'general':
-        sys_prompt = f"You are the study assistant for the channel: #{channel}. Answer questions specifically relating to this academic subject."
-    
-    pdf_ctx = session.get('pdf_context')
-    context_prefix = ""
-    if pdf_ctx:
-        context_prefix = f"[STUDY SOURCE DOCUMENT CONTEXT: {pdf_ctx}]\n\n"
-
-    if api_key:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            full_query = f"{sys_prompt}\n\n{context_prefix}User query: {prompt}"
-            response = model.generate_content(full_query)
-            return response.text
-        except Exception as e:
-            return f"⚠️ Gemini API Error: {str(e)}\n\n(Fallback Active) Try re-entering your key in Settings."
-
-    # Fallback Responder
-    clean = prompt.lower()
-    if "sensory memory" in clean or "iconic" in clean:
-        return "👀 **Sensory Memory Context:**\nIt stores sensory inputs for fractions of a second. Iconic memory (visual) decays in under 1 second, while Echoic memory (auditory) lasts 3-4 seconds before entering Short-Term Memory buffer."
-    elif "bias" in clean or "ethical" in clean:
-        return "⚖️ **AI Bias:**\nAlgorithms replicate patterns present in historical training datasets. If dataset values represent biased historical hiring decisions, the output models replicate those system biases."
-    elif "quiz" in clean:
-        return "📝 Let's do a quick quiz! Head over to the **Quizzes** tab at the top navbar. You can take multi-question tests or upload source texts to generate custom quizzes!"
-    elif "tips" in clean or "study" in clean:
-        return "💡 **UniFlow Study Tips:**\n1. Use **Active Recall**: Test your memory instead of just highlighting text.\n2. Apply **Spaced Repetition** on your flashcard decks.\n3. Cycle Pomodoros to maintain focus."
-    
-    return f"Hello! I am your study buddy. 💡 (Offline Mock Mode). You asked about: '{prompt}'.\n\nTo unlock fully intelligent answers, add a Gemini API Key in Settings!"
+    return redirect(url_for('home_route'))
 
 # --- AI NOTEBOOK ACTIONS ---
 

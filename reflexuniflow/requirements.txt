@@ -1,0 +1,3 @@
+
+reflex[db]==0.9.6.post1
+huggingface-hub

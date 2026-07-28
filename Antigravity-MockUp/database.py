@@ -127,57 +127,20 @@ def init_db():
         cursor.execute("INSERT OR IGNORE INTO subjects (name, color) VALUES ('AI Ethics', '#C9A15B')")
         cursor.execute("INSERT OR IGNORE INTO subjects (name, color) VALUES ('Computer Science', '#5A3E22')")
         
-        # 3. Events
-        cursor.execute("INSERT INTO events (title, date, timeStart, timeEnd, location, category) VALUES (?, ?, ?, ?, ?, ?)", 
-                       ("Psychology Lecture", "2026-07-13", "10:00", "11:30", "Room 402 • Hall A", "Cognitive Psychology"))
-        cursor.execute("INSERT INTO events (title, date, timeStart, timeEnd, location, category) VALUES (?, ?, ?, ?, ?, ?)", 
-                       ("Study Group: AI Ethics", "2026-07-14", "14:00", "15:30", "Library Commons", "AI Ethics"))
-        cursor.execute("INSERT INTO events (title, date, timeStart, timeEnd, location, category) VALUES (?, ?, ?, ?, ?, ?)", 
-                       ("Focus Revision", "2026-07-16", "17:00", "18:30", "Personal Desk", "Computer Science"))
-        
-        # 4. To-Dos
-        cursor.execute("INSERT INTO todos (title, category, date, time, completed) VALUES (?, ?, ?, ?, 0)", 
-                       ("Review Sensory Memory Chapter", "Cognitive Psychology", "2026-07-13", "12:00"))
-        cursor.execute("INSERT INTO todos (title, category, date, time, completed) VALUES (?, ?, ?, ?, 0)", 
-                       ("Read Algorithmic Bias Guidelines", "AI Ethics", "2026-07-14", "16:00"))
-        
-        # 5. Decks & Cards
-        cursor.execute("INSERT INTO decks (title, last_practiced, progress) VALUES ('Cognitive Bias', '2h ago', 65)")
-        deck1_id = cursor.lastrowid
-        cursor.execute("INSERT INTO decks (title, last_practiced, progress) VALUES ('Neural Networks', '1d ago', 40)")
-        deck2_id = cursor.lastrowid
-        
-        # Cards for Deck 1
-        cards_d1 = [
-            ("Confirmation Bias", "The tendency to search for, interpret, favor, and recall information in a way that confirms or supports one's prior beliefs or values.", 0),
-            ("Anchor Bias", "The common human tendency to rely too heavily on the first piece of information offered (the 'anchor') when making decisions.", 1),
-            ("Availability Heuristic", "A mental shortcut that relies on immediate examples that come to mind when evaluating a specific topic or decision.", 0),
-            ("Dunning-Kruger Effect", "A cognitive bias whereby people with low ability or knowledge tend to overestimate their ability or expertise.", 1),
-            ("Halo Effect", "The tendency for positive impressions of a person in one area to positively influence one's opinion or feelings in other areas.", 0)
-        ]
-        for q, a, inc in cards_d1:
-            cursor.execute("INSERT INTO cards (deck_id, question, answer, incorrect) VALUES (?, ?, ?, ?)", (deck1_id, q, a, inc))
-            
-        # Cards for Deck 2
-        cards_d2 = [
-            ("Activation Function", "A mathematical formula that determines whether a neuron should fire based on the weighted sum of its inputs (e.g. ReLU, Sigmoid).", 0),
-            ("Backpropagation", "The algorithm used for training neural networks by calculating the gradient of the loss function with respect to weights, propagating errors backward.", 0),
-            ("Overfitting", "A modeling error in machine learning where a model learns training data noise too well, leading to poor generalization on new data.", 0),
-            ("Gradient Descent", "An optimization algorithm used to minimize a loss function by iteratively moving in the direction of steepest descent.", 0)
-        ]
-        for q, a, inc in cards_d2:
-            cursor.execute("INSERT INTO cards (deck_id, question, answer, incorrect) VALUES (?, ?, ?, ?)", (deck2_id, q, a, inc))
+        # 3. Events (Cleared)
+        # No default events
 
-        # 6. Default Focus Heatmap Sessions
-        import time
-        t_now = time.time()
-        for offset_days in [6, 5, 4, 3, 2, 1, 0]:
-            cursor.execute("INSERT INTO focus_sessions (timestamp, duration, type) VALUES (?, ?, ?)",
-                           (t_now - offset_days * 24 * 3600, 25.0, "work"))
+        # 4. To-Dos (Cleared)
+        # No default todos
 
-        # 7. Default Chat Messages
-        cursor.execute("INSERT INTO chat_messages (channel, sender, text, timestamp) VALUES (?, ?, ?, ?)",
-                       ("general", "ai", "Hey! I am UniFlow Buddy, your study companion. 🚀 Ask me any questions, upload a PDF context, or try out the quizzes!", t_now))
+        # 5. Decks & Cards (Cleared)
+        # No default decks
+
+        # 6. Focus Heatmap Sessions (Cleared)
+        # No default focus sessions
+
+        # 7. Default Chat Messages (Cleared)
+        # No default chat messages
         
         # 8. Quizzes
         cursor.execute("INSERT INTO quizzes (title) VALUES ('Cognitive Memory & Sensory Buffer')")
@@ -203,7 +166,7 @@ def init_db():
         cursor.execute("""
         INSERT INTO quiz_questions (quiz_id, question, correct, opt_a, opt_b, opt_c, opt_d) VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (quiz2_id, "What is the main goal of AI alignment?", "B", "Making models train faster", "Ensuring AI actions align with human goals and values", "Scaling parameter count", "Writing code in python"))
-
+        
     conn.commit()
     conn.close()
 
