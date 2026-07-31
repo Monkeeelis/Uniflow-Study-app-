@@ -1,0 +1,114 @@
+{
+  "onboarding": {
+    "completed": true,
+    "completed_devices": [
+      "a21767f64350493981745b87b1f615c8"
+    ],
+    "step": 3,
+    "name": "Sam",
+    "year_level": "Year 11",
+    "subjects": [
+      "sdf",
+      "asd"
+    ],
+    "pomodoro_work": 25,
+    "pomodoro_break": 5,
+    "notifications_enabled": true
+  },
+  "tasks": {
+    "items": [],
+    "show_form": false,
+    "editing_id": "",
+    "filter_subject": "All",
+    "filter_priority": "All",
+    "sort_by": "due_date",
+    "show_completed": true,
+    "feedback": {
+      "message": "",
+      "kind": ""
+    }
+  },
+  "calendar": {
+    "events": [],
+    "categories": [
+      {
+        "name": "Class",
+        "color": "#b45309"
+      },
+      {
+        "name": "Study",
+        "color": "#0d9488"
+      },
+      {
+        "name": "Exam",
+        "color": "#dc2626"
+      },
+      {
+        "name": "Personal",
+        "color": "#7c3aed"
+      }
+    ],
+    "view_mode": "month",
+    "current": {
+      "year": 2026,
+      "month": 7,
+      "day": 31
+    },
+    "show_event_form": false,
+    "editing_event_id": "",
+    "selected_date": "",
+    "show_event_detail": false,
+    "detail_event_id": "",
+    "show_category_form": false,
+    "feedback": {
+      "message": "",
+      "kind": ""
+    }
+  },
+  "focus": {
+    "mode": "timer",
+    "running": false,
+    "elapsed_ds": 0,
+    "pomodoro_phase": "work",
+    "completed_cycles": 0,
+    "total_cycles": 4,
+    "timer_duration_minutes": 15,
+    "session_started_at": "",
+    "sessions": []
+  },
+  "dashboard": {
+    "quote_index": 0,
+    "timer_running": false,
+    "timer_seconds": 0,
+    "timer_started_at": "",
+    "sessions": []
+  },
+  "flashcards": {
+    "decks": [],
+    "selected_deck_id": "",
+    "show_deck_form": false,
+    "show_card_form": false,
+    "editing_card_id": "",
+    "review": {
+      "mode": "",
+      "order": [],
+      "index": 0,
+      "flipped": false,
+      "correct": 0,
+      "incorrect": 0,
+      "last_result": "",
+      "finished": false
+    },
+    "feedback": {
+      "message": "",
+      "kind": ""
+    }
+  },
+  "notifications": {
+    "items": [],
+    "show_panel": false
+  },
+  "insights": {
+    "range_mode": "month"
+  }
+}
