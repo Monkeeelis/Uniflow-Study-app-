@@ -52,6 +52,8 @@ ACTIONS: dict[str, Action] = {
         data
     ),
     "onboarding/finish": lambda data, p: onboarding.finish(data, g.device_id),
+    "onboarding/reset-confirm": onboarding.set_reset_confirm,
+    "onboarding/reset": lambda data, p: onboarding.reset(data),
     "tasks/save": tasks.submit,
     "tasks/delete": lambda data, p: tasks.delete(data, text(p, "task_id")),
     "tasks/toggle": lambda data, p: tasks.toggle_complete(data, text(p, "task_id")),

@@ -537,6 +537,13 @@ svg {
 .btn-danger-outline:hover {
   background: var(--danger-tint);
 }
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: var(--danger-ink);
+}
 .btn-lg {
   padding: 12px 24px;
   border-radius: var(--r-lg);

@@ -5,7 +5,7 @@
 import { h } from "../dom.js";
 import { icon } from "../icons.js";
 import { act } from "../state.js";
-import { metric, selectField, tile } from "../ui.js";
+import { metric, modal, selectField, tile } from "../ui.js";
 
 function section(title, body) {
   return h("div", { class: "card mb-6" }, h("h2", { class: "h3 mb-4" }, title), body);
@@ -154,6 +154,64 @@ function subjectsSection(onboarding) {
   );
 }
 
+function resetSection() {
+  return section(
+    "Reset UniFlow",
+    h(
+      "div",
+      {},
+      h(
+        "p",
+        { class: "p small muted mb-4" },
+        "Clears your profile, tasks, events, focus sessions and decks, then starts the setup wizard again. This cannot be undone.",
+      ),
+      h(
+        "button",
+        {
+          class: "btn btn-danger-outline",
+          onClick: () => act("onboarding/reset-confirm", { open: true }),
+        },
+        icon("rotate-ccw", "icon-sm"),
+        "Reset all data",
+      ),
+    ),
+  );
+}
+
+function resetConfirmModal() {
+  const close = () => act("onboarding/reset-confirm", { open: false });
+  return modal({
+    title: "Reset everything?",
+    small: true,
+    onClose: close,
+    children: h(
+      "div",
+      {},
+      h(
+        "div",
+        { class: "banner is-warning mb-4", role: "status" },
+        icon("triangle-alert", "icon-sm"),
+        h("span", {}, "This permanently deletes all of your data."),
+      ),
+      h(
+        "p",
+        { class: "p small muted" },
+        "Your profile, subjects, tasks, calendar events, focus sessions and flashcard decks will all be erased, and UniFlow will return to the setup wizard.",
+      ),
+    ),
+    footer: h(
+      "div",
+      { class: "row mt-6", style: { gap: "12px" } },
+      h("button", { class: "btn btn-outline btn-flex", type: "button", onClick: close }, "Cancel"),
+      h(
+        "button",
+        { class: "btn btn-danger btn-flex", type: "button", onClick: () => act("onboarding/reset") },
+        "Yes, reset everything",
+      ),
+    ),
+  });
+}
+
 export function profilePage(state) {
   const { onboarding, tasks, focus, stats, insights } = state;
 
@@ -265,5 +323,7 @@ export function profilePage(state) {
         ),
       ),
     ),
+    resetSection(),
+    onboarding.show_reset_confirm ? resetConfirmModal() : null,
   );
 }

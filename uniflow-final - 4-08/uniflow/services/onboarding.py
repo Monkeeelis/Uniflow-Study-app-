@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from uniflow import store
 from uniflow.services.common import flag, positive_int, text, toast
 
 YEAR_OPTIONS = [
@@ -84,6 +85,23 @@ def finish(data: dict[str, Any], device_id: str) -> dict[str, str]:
     return toast(greeting, "success")
 
 
+def set_reset_confirm(data: dict[str, Any], payload: dict[str, Any]) -> None:
+    """Open or close the "are you sure?" dialog that guards a full reset."""
+    data["onboarding"]["show_reset_confirm"] = flag(payload, "open")
+
+
+def reset(data: dict[str, Any]) -> dict[str, str]:
+    """Throw the whole document away and start over at the wizard.
+
+    Mutated in place rather than returned, because the caller saves the very
+    dict it handed us. Clearing ``completed_devices`` is what sends this
+    browser back to onboarding — see ``view`` below.
+    """
+    data.clear()
+    data.update(store.default_data())
+    return toast("Everything has been reset.", "success")
+
+
 def view(data: dict[str, Any], device_id: str) -> dict[str, Any]:
     ob = data["onboarding"]
     return {
@@ -97,4 +115,5 @@ def view(data: dict[str, Any], device_id: str) -> dict[str, Any]:
         "pomodoro_work": ob["pomodoro_work"],
         "pomodoro_break": ob["pomodoro_break"],
         "notifications_enabled": ob["notifications_enabled"],
+        "show_reset_confirm": ob["show_reset_confirm"],
     }

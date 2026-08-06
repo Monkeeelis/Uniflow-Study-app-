@@ -42,6 +42,7 @@ def default_data() -> dict[str, Any]:
             "pomodoro_work": 25,
             "pomodoro_break": 5,
             "notifications_enabled": True,
+            "show_reset_confirm": False,
         },
         "tasks": {
             "items": [],
