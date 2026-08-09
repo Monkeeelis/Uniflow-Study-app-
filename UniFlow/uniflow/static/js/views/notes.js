@@ -359,6 +359,19 @@ function editorPane(notes, onboarding, flashcards) {
           "button",
           {
             class: "icon-btn",
+            "aria-label": "Auto-generate flashcards from this note",
+            title: 'Auto-generate flashcards from "Term: Definition" lines',
+            onClick: async () => {
+              await save();
+              await act("flashcards/generate-from-note", { note_id: note.id });
+            },
+          },
+          icon("sparkles", "icon-sm"),
+        ),
+        h(
+          "button",
+          {
+            class: "icon-btn",
             "aria-label": note.pinned ? "Unpin note" : "Pin note",
             onClick: () => act("notes/pin", { note_id: note.id }),
           },

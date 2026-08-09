@@ -85,6 +85,17 @@ def sanitize_body(raw: str) -> str:
     return "".join(parser.out)
 
 
+def plain_lines(body_html: str) -> list[str]:
+    """Break a note's sanitized HTML body into plain-text lines, one per
+    block/line-break, for callers (like flashcard auto-generation) that need
+    to read it line by line rather than as one blob."""
+    text_ = re.sub(r"<br\s*/?>", "\n", body_html or "", flags=re.IGNORECASE)
+    text_ = re.sub(r"</(p|div|li)>", "\n", text_, flags=re.IGNORECASE)
+    text_ = re.sub(r"<[^>]+>", "", text_)
+    text_ = html.unescape(text_)
+    return [line.strip() for line in text_.split("\n") if line.strip()]
+
+
 def _snippet(body_html: str, length: int = 140) -> str:
     plain = re.sub(r"<[^>]+>", " ", body_html or "")
     plain = re.sub(r"\s+", " ", plain).strip()

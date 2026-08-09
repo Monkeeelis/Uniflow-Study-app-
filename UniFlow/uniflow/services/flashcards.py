@@ -6,9 +6,16 @@ import random
 import uuid
 from typing import Any
 
+from uniflow.services import notes as notes_service
 from uniflow.services.common import flag, set_feedback, text, toast
 
 REVIEW_MODES = ("flashcards", "quiz")
+
+# Lines like "Mitosis: cell division producing identical daughter cells" or
+# "Mitosis - cell division..." become a card; anything without one of these
+# separators is prose, not a term/definition pair, and gets skipped.
+_PAIR_SEPARATORS = (":", " - ", " – ")
+_MAX_GENERATED_CARDS = 30
 
 EMPTY_CARD: dict[str, Any] = {
     "id": "",
@@ -170,6 +177,66 @@ def delete_card(data: dict[str, Any], card_id: str) -> dict[str, str] | None:
     label = removed["front"][:40] + ("…" if len(removed["front"]) > 40 else "")
     set_feedback(section, f"Deleted card: {label}", "info")
     return toast(f"Deleted card: {label}", "info")
+
+
+def _extract_pairs(lines: list[str]) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for line in lines:
+        for sep in _PAIR_SEPARATORS:
+            if sep not in line:
+                continue
+            front, _, back = line.partition(sep)
+            front, back = front.strip(" -–:"), back.strip(" -–:")
+            if front and back and len(front) <= 200:
+                pairs.append((front, back))
+            break
+    return pairs
+
+
+def generate_from_note(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]:
+    """Turn a note's "Term: Definition" style lines into flashcards, filed
+    into a deck matching the note's subject (created if it doesn't exist)."""
+    section = data["flashcards"]
+    note_id = text(payload, "note_id")
+    note = next((n for n in data["notes"]["items"] if n["id"] == note_id), None)
+    if note is None:
+        return toast("Note not found.", "warning")
+
+    pairs = _extract_pairs(notes_service.plain_lines(note["content"]))
+    if not pairs:
+        return toast(
+            'No "Term: Definition" style lines found to turn into flashcards.',
+            "warning",
+        )
+
+    deck_name = note["subject"] or note["title"] or "General"
+    deck = next((d for d in section["decks"] if d["name"] == deck_name), None)
+    if deck is None:
+        deck = {"id": str(uuid.uuid4()), "name": deck_name, "subject": note["subject"], "cards": []}
+        section["decks"].append(deck)
+
+    existing_fronts = {c["front"].lower() for c in deck["cards"]}
+    created = 0
+    for front, back in pairs[:_MAX_GENERATED_CARDS]:
+        if front.lower() in existing_fronts:
+            continue
+        deck["cards"].append(
+            {
+                "id": str(uuid.uuid4()),
+                "front": front,
+                "back": back,
+                "times_reviewed": 0,
+                "times_correct": 0,
+            }
+        )
+        existing_fronts.add(front.lower())
+        created += 1
+
+    section["selected_deck_id"] = deck["id"]
+    if created == 0:
+        return toast("Those flashcards were already in the deck.", "info")
+    set_feedback(section, f"Generated {created} flashcard(s) from \"{note['title']}\".", "success")
+    return toast(f"Generated {created} flashcard(s) into \"{deck_name}\".", "success")
 
 
 # --- review / quiz ---------------------------------------------------------

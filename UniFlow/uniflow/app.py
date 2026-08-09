@@ -114,6 +114,7 @@ ACTIONS: dict[str, Action] = {
     "flashcards/review/next": lambda data, p: flashcards.next_card(data),
     "flashcards/review/exit": lambda data, p: flashcards.exit_review(data),
     "flashcards/feedback/clear": lambda data, p: flashcards.clear_feedback(data),
+    "flashcards/generate-from-note": flashcards.generate_from_note,
     "notes/select": notes.select_note,
     "notes/new": lambda data, p: notes.new_note(data),
     "notes/save": notes.submit,

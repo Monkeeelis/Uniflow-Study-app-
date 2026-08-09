@@ -250,7 +250,7 @@ export function focusPage(state) {
     ),
     h(
       "div",
-      { class: "switch mb-8" },
+      { class: "switch mb-8", style: { marginBottom: "45px" } },
       modePill(focus, { label: "Pomodoro", value: "pomodoro", icon: "brain" }),
       modePill(focus, { label: "Timer", value: "timer", icon: "hourglass" }),
     ),

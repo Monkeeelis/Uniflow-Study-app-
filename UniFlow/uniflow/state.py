@@ -17,7 +17,6 @@ from uniflow.services import (
     tasks,
 )
 
-
 def build_state(data: dict[str, Any], device_id: str = "") -> dict[str, Any]:
     return {
         "onboarding": onboarding.view(data, device_id),

@@ -10,6 +10,7 @@
 import { ping } from "./api.js";
 import { clockTime, countdown } from "./format.js";
 import { act, state, subscribe } from "./state.js";
+import { playChime } from "./ambient.js";
 
 const SYNC_EVERY_MS = 5000;
 
@@ -58,6 +59,7 @@ function tick() {
     if (clock.focusDs >= targetDs && !phaseChangePending) {
       phaseChangePending = true;
       clock.focusDs = targetDs;
+      playChime();
       act("focus/complete", { elapsed_ds: targetDs }).then(() => {
         rebaseFocus(0);
         phaseChangePending = false;

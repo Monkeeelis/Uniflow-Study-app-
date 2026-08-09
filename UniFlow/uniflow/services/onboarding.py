@@ -19,8 +19,6 @@ THEME_OPTIONS = [
     {"value": "light", "label": "Cream (default)"},
     {"value": "high-contrast", "label": "High Contrast"},
     {"value": "ocean", "label": "Ocean"},
-    {"value": "forest", "label": "Forest"},
-    {"value": "sepia", "label": "Sepia"},
     {"value": "purple", "label": "Purple & Yellow"},
     {"value": "pink", "label": "Pink"},
 ]

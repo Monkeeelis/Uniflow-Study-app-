@@ -1,3 +1,5 @@
+// Transient toast notifications shown in the bottom corner stack.
+
 import { h } from "./dom.js";
 import { feedbackIcon } from "./icons.js";
 

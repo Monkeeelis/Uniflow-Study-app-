@@ -85,10 +85,28 @@ function noiseBuffer(context, colour) {
   return buffer;
 }
 
+// Plays a looping noise buffer. "Rain" (brown noise) gets a lowpass filter
+// to cut the harsh high-frequency hiss that otherwise reads as radio static,
+// leaving the raw White/Pink options untouched since those are labeled as-is.
 function playNoise(context, master, colour) {
   const source = context.createBufferSource();
   source.buffer = noiseBuffer(context, colour);
   source.loop = true;
+
+  if (colour === "brown") {
+    const filter = context.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1800;
+    source.connect(filter);
+    filter.connect(master);
+    source.start();
+    return () => {
+      source.stop();
+      source.disconnect();
+      filter.disconnect();
+    };
+  }
+
   source.connect(master);
   source.start();
   return () => {
@@ -280,16 +298,19 @@ function playLofi(context, master) {
   };
 }
 
+// Returns a copy of the current {kind, volume} preference.
 export function currentPrefs() {
   return { ...prefs };
 }
 
+// Updates and persists playback volume; applies live if something's playing.
 export function setVolume(volume) {
   prefs.volume = Math.min(1, Math.max(0, volume));
   savePrefs(prefs);
   if (gainNode) gainNode.gain.value = prefs.volume;
 }
 
+// Tears down whatever ambient sound is currently playing, if any.
 export function stop() {
   cleanup();
   cleanup = () => {};
@@ -300,6 +321,7 @@ export function stop() {
   currentKind = "none";
 }
 
+// Stops any current sound and starts the given ambient kind ("none" just stops).
 export function play(kind) {
   prefs.kind = kind;
   savePrefs(prefs);
@@ -321,4 +343,34 @@ export function play(kind) {
 
 export function activeKind() {
   return currentKind;
+}
+
+// A soft three-note bell (major triad, each note staggered) for the timer
+// reaching zero — reuses the shared AudioContext so it works even if no
+// ambient sound is currently playing, but doesn't touch ambient's own
+// gain/cleanup state.
+const CHIME_NOTES = [523.25, 659.25, 783.99]; // C5, E5, G5
+const CHIME_NOTE_GAP_S = 0.12;
+const CHIME_NOTE_DURATION_S = 1.6;
+
+export function playChime(volume = 0.5) {
+  const context = ensureContext();
+  if (context.state === "suspended") context.resume();
+
+  CHIME_NOTES.forEach((freq, i) => {
+    const start = context.currentTime + i * CHIME_NOTE_GAP_S;
+    const osc = context.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(volume * 0.5, start + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + CHIME_NOTE_DURATION_S);
+
+    osc.connect(gain);
+    gain.connect(context.destination);
+    osc.start(start);
+    osc.stop(start + CHIME_NOTE_DURATION_S + 0.1);
+  });
 }
