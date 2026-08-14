@@ -111,10 +111,9 @@ function navbar(state) {
             navigate("/dashboard");
           },
         },
-        h("img", {
-          src: "/static/img/logo-mark.png",
-          alt: "",
+        h("span", {
           class: ["brand-mark", playIntro && "brand-mark-intro"],
+          "aria-hidden": "true",
         }),
         h("span", { class: ["brand-name", playIntro && "brand-name-intro"] }, "UniFlow"),
       ),

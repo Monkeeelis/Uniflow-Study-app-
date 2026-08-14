@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,13 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(
     os.environ.get("UNIFLOW_DATA_DIR", PACKAGE_DIR.parent / "data")
 )
-DATA_FILE = DATA_DIR / "uniflow.json"
+DATA_FILE = DATA_DIR / "uniflow.json"  # legacy single-shared-file location
+
+# Each browser gets its own file here, keyed by the device-id cookie app.py
+# already sets — so hosting the app publicly (e.g. on PythonAnywhere) no
+# longer means every visitor reads and writes the same document.
+DEVICES_DIR = DATA_DIR / "devices"
+_migration_lock = threading.Lock()
 
 DEFAULT_CATEGORIES: list[dict[str, str]] = [
     {"name": "Class", "color": "#b45309"},
@@ -157,29 +164,49 @@ def _merge(defaults: Any, saved: Any) -> Any:
     return saved if _same_shape(defaults, saved) else defaults
 
 
-def load() -> dict[str, Any]:
+def _device_file(device_id: str) -> Path:
+    return DEVICES_DIR / f"{device_id}.json"
+
+
+def _migrate_legacy_file(device_file: Path) -> None:
+    """One-time upgrade path: the first device to load after switching to
+    per-device files inherits whatever was in the old shared uniflow.json,
+    so nobody's existing data disappears. Every device after that just
+    starts fresh, since the whole point is no longer sharing one file."""
+    with _migration_lock:
+        if DEVICES_DIR.exists() or not DATA_FILE.exists():
+            return
+        DEVICES_DIR.mkdir(parents=True, exist_ok=True)
+        DATA_FILE.replace(device_file)
+
+
+def load(device_id: str) -> dict[str, Any]:
     defaults = default_data()
-    if not DATA_FILE.exists():
+    device_file = _device_file(device_id)
+    if not device_file.exists():
+        _migrate_legacy_file(device_file)
+    if not device_file.exists():
         return defaults
     try:
-        saved = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        saved = json.loads(device_file.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
-        logging.exception(f"Could not read {DATA_FILE}, starting fresh: {e}")
+        logging.exception(f"Could not read {device_file}, starting fresh: {e}")
         return defaults
     if not isinstance(saved, dict):
         return defaults
     return _merge(defaults, saved)
 
 
-def save(data: dict[str, Any]) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+def save(data: dict[str, Any], device_id: str) -> None:
+    DEVICES_DIR.mkdir(parents=True, exist_ok=True)
+    device_file = _device_file(device_id)
     payload = json.dumps(data, indent=2, ensure_ascii=False)
     # Write beside the target then swap, so a crash never truncates the file.
-    handle, tmp_path = tempfile.mkstemp(dir=DATA_DIR, suffix=".tmp")
+    handle, tmp_path = tempfile.mkstemp(dir=DEVICES_DIR, suffix=".tmp")
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as f:
             f.write(payload)
-        os.replace(tmp_path, DATA_FILE)
+        os.replace(tmp_path, device_file)
     except OSError as e:
-        logging.exception(f"Could not save {DATA_FILE}: {e}")
+        logging.exception(f"Could not save {device_file}: {e}")
         Path(tmp_path).unlink(missing_ok=True)

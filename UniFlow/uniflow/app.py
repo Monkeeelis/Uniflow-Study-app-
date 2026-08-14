@@ -189,7 +189,9 @@ def _page() -> str:
 
 
 def _state():
-    return jsonify({"state": build_state(store.load(), g.device_id), "toast": None})
+    return jsonify(
+        {"state": build_state(store.load(g.device_id), g.device_id), "toast": None}
+    )
 
 
 def _action(action: str):
@@ -202,7 +204,7 @@ def _action(action: str):
         payload = {}
 
     with _write_lock:
-        data = store.load()
+        data = store.load(g.device_id)
         try:
             result = handler(data, payload)
         except Exception:
@@ -210,7 +212,7 @@ def _action(action: str):
             # document or crash the request — reload what was on disk, tell
             # the user, and let them keep using the rest of the app.
             logging.exception(f"Action '{action}' failed")
-            fresh = store.load()
+            fresh = store.load(g.device_id)
             return jsonify(
                 {
                     "state": build_state(fresh, g.device_id),
@@ -220,7 +222,7 @@ def _action(action: str):
                     },
                 }
             )
-        store.save(data)
+        store.save(data, g.device_id)
 
     if action in QUIET_ACTIONS:
         return jsonify({"ok": True})

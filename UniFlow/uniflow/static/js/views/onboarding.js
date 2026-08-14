@@ -116,6 +116,15 @@ function stepPomodoro(ob) {
       value: String(ob.pomodoro_break),
       onChange: (event) => act("onboarding/update", { pomodoro_break: event.target.value }),
     }),
+    h("label", { class: "label mt-4", for: "ob-goal" }, "Weekly study goal (minutes)"),
+    h("input", {
+      class: "input",
+      id: "ob-goal",
+      type: "number",
+      min: "1",
+      value: String(ob.weekly_goal_minutes),
+      onChange: (event) => act("onboarding/update", { weekly_goal_minutes: event.target.value }),
+    }),
   );
 }
 

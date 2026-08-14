@@ -616,12 +616,20 @@ svg {
 .brand-mark {
   width: 28px;
   height: 28px;
-  object-fit: contain;
   flex: none;
+  display: inline-block;
+  background-color: #5c3a1e;
+  -webkit-mask-image: url("/static/img/logo-mark.png");
+  mask-image: url("/static/img/logo-mark.png");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
-:root[data-mode="dark"] .brand-mark,
-:root[data-theme="high-contrast"] .brand-mark {
-  filter: invert(1) brightness(1.1);
+:root[data-mode="dark"] .brand-mark {
+  background-color: #f0e6d6;
 }
 
 @keyframes logo-intro-mark {
@@ -2035,6 +2043,29 @@ svg {
   border: 2px solid var(--danger-border);
   color: var(--danger-ink);
 }
+/* Pink theme: correct answers get a light-pink treatment instead of the
+   teal used elsewhere (teal is itself pink-shifted in this theme, but not
+   distinctly "light pink"); wrong answers stay red for clear contrast. */
+:root[data-theme="pink"] .result-good {
+  background: #fce4ef;
+  border-color: #f9a8d4;
+  color: #9d174d;
+}
+:root[data-theme="pink"] .result-bad {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+:root[data-theme="pink"][data-mode="dark"] .result-good {
+  background: #3d1c2f;
+  border-color: #f472b6;
+  color: #f9a8d4;
+}
+:root[data-theme="pink"][data-mode="dark"] .result-bad {
+  background: #3f1d1d;
+  border-color: #6b2b2b;
+  color: #fca5a5;
+}
 .score-big {
   font-family: var(--display);
   font-weight: 700;
@@ -2178,6 +2209,10 @@ svg {
 }
 
 .notes-sidebar {
+  /* Fixed dark-brown/cream palette regardless of theme mode, so this panel
+     doesn't invert to a light box when --heading/--cream flip in dark mode. */
+  --heading: #5c3a1e;
+  --cream: #faf1dd;
   background: var(--heading);
   border-radius: var(--r-lg);
   padding: 20px 16px;

@@ -10,10 +10,9 @@ const STORAGE_KEY = "uniflow.ambient";
 
 export const AMBIENT_OPTIONS = [
   { value: "none", label: "Off" },
-  { value: "white", label: "White Noise" },
+  { value: "brown", label: "White Noise" },
   { value: "pink", label: "Pink Noise" },
-  { value: "brown", label: "Rain" },
-  { value: "lofi", label: "Lo-Fi Music" },
+  { value: "rain", label: "Rain" },
 ];
 
 let ctx = null;
@@ -57,19 +56,22 @@ function noiseBuffer(context, colour) {
   }
 
   if (colour === "pink") {
-    // Paul Kellet's refined pink noise filter.
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    // Voss-McCartney algorithm: sum a handful of white-noise generators that
+    // each update at half the rate of the last, producing the -3dB/octave
+    // rolloff that distinguishes pink from white/brown noise.
+    const rows = new Array(7).fill(0);
+    let runningSum = 0;
     for (let i = 0; i < data.length; i++) {
-      const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.969 * b2 + white * 0.153852;
-      b3 = 0.8665 * b3 + white * 0.3104856;
-      b4 = 0.55 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.016898;
-      const pink = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-      b6 = white * 0.115926;
-      data[i] = pink * 0.11;
+      let rowIndex = 0;
+      let n = i + 1;
+      while (n % 2 === 0 && rowIndex < rows.length - 1) {
+        n /= 2;
+        rowIndex += 1;
+      }
+      runningSum -= rows[rowIndex];
+      rows[rowIndex] = Math.random() * 2 - 1;
+      runningSum += rows[rowIndex];
+      data[i] = (runningSum / rows.length) * 1.8;
     }
     return buffer;
   }
@@ -85,9 +87,10 @@ function noiseBuffer(context, colour) {
   return buffer;
 }
 
-// Plays a looping noise buffer. "Rain" (brown noise) gets a lowpass filter
-// to cut the harsh high-frequency hiss that otherwise reads as radio static,
-// leaving the raw White/Pink options untouched since those are labeled as-is.
+// Plays a looping noise buffer. The exposed "White Noise" option is actually
+// brown noise run through a lowpass filter — raw white/brown noise reads as
+// harsh static, this sounds soft and rain-like while keeping the label
+// listeners expect.
 function playNoise(context, master, colour) {
   const source = context.createBufferSource();
   source.buffer = noiseBuffer(context, colour);
@@ -115,186 +118,31 @@ function playNoise(context, master, colour) {
   };
 }
 
-// A mellow two-chord lo-fi pad (Fmaj7 -> Dm7), each note a pair of slightly
-// detuned triangle/sine oscillators through a warm lowpass filter. A simple
-// boom-bap drum loop joins in a few seconds later, locked to the same grid
-// as the chords (12 steps per chord divides LOFI_CHORD_SECONDS exactly) so
-// it always lands on the beat instead of drifting against the pad.
-const LOFI_CHORDS = [
-  [174.61, 220.0, 261.63, 329.63], // F3 A3 C4 E4 (Fmaj7)
-  [146.83, 174.61, 220.0, 261.63], // D3 F3 A3 C4 (Dm7)
-];
-const LOFI_CHORD_SECONDS = 4.5;
-const DRUM_START_DELAY_MS = 5000;
-const DRUM_STEPS_PER_CHORD = 12;
-const DRUM_STEP_SECONDS = LOFI_CHORD_SECONDS / DRUM_STEPS_PER_CHORD;
-// 12 sixteenth-ish steps: kick, rest, hat, snare, rest, hat, kick, rest, hat, snare, rest, hat.
-const DRUM_PATTERN = ["kick", null, "hat", "snare", null, "hat", "kick", null, "hat", "snare", null, "hat"];
-// Drums get the same warm lowpass character as the pad, so they read as
-// part of the same recording rather than a separate, brighter layer.
-const DRUM_FILTER_FREQ = 3200;
+// Bundled rain recording, fetched and decoded once then cached in memory
+// (the file never changes, so re-decoding on every play() would be wasted
+// work).
+const RAIN_URL = "/static/audio/rain.mp3";
+let rainBufferPromise = null;
 
-function playKick(context, master, time) {
-  const osc = context.createOscillator();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(140, time);
-  osc.frequency.exponentialRampToValueAtTime(45, time + 0.15);
-
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.7, time);
-  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
-
-  osc.connect(gain);
-  gain.connect(master);
-  osc.start(time);
-  osc.stop(time + 0.3);
-}
-
-function playHihat(context, master, time) {
-  const source = context.createBufferSource();
-  source.buffer = noiseBuffer(context, "white");
-
-  const filter = context.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.value = 6500;
-
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.09, time);
-  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(master);
-  source.start(time);
-  source.stop(time + 0.06);
-}
-
-function playSnare(context, master, time) {
-  const source = context.createBufferSource();
-  source.buffer = noiseBuffer(context, "white");
-
-  const filter = context.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.frequency.value = 1600;
-
-  const warmth = context.createBiquadFilter();
-  warmth.type = "lowpass";
-  warmth.frequency.value = DRUM_FILTER_FREQ;
-
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.3, time);
-  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
-
-  source.connect(filter);
-  filter.connect(warmth);
-  warmth.connect(gain);
-  gain.connect(master);
-  source.start(time);
-  source.stop(time + 0.16);
-}
-
-// A short dip in the pad's own gain on every kick — the "sidechain pump"
-// that glues drums and chords together in the same mix instead of sounding
-// like two unrelated loops layered on top of each other.
-function duckChords(context, chordBus, time) {
-  const gain = chordBus.gain;
-  const current = gain.value;
-  gain.cancelScheduledValues(time);
-  gain.setValueAtTime(current, time);
-  gain.linearRampToValueAtTime(current * 0.55, time + 0.05);
-  gain.linearRampToValueAtTime(current, time + 0.3);
-}
-
-function playDrums(context, drumBus, chordBus) {
-  // Snap the entrance to the next chord downbeat at/after the 5s mark, so
-  // the beat always drops in step with the pad rather than mid-bar.
-  const chordsSinceStart = Math.ceil(DRUM_START_DELAY_MS / 1000 / LOFI_CHORD_SECONDS);
-  const startDelayMs = chordsSinceStart * LOFI_CHORD_SECONDS * 1000;
-
-  let stepIndex = 0;
-  let timerId = null;
-  const step = () => {
-    const hit = DRUM_PATTERN[stepIndex % DRUM_PATTERN.length];
-    const time = context.currentTime;
-    if (hit === "kick") {
-      playKick(context, drumBus, time);
-      duckChords(context, chordBus, time);
-    } else if (hit === "hat") {
-      playHihat(context, drumBus, time);
-    } else if (hit === "snare") {
-      playSnare(context, drumBus, time);
-    }
-    stepIndex += 1;
-    timerId = setTimeout(step, DRUM_STEP_SECONDS * 1000);
-  };
-  const startId = setTimeout(step, startDelayMs);
-
-  return () => {
-    clearTimeout(startId);
-    clearTimeout(timerId);
-  };
-}
-
-function playLofiChord(context, master, freqs) {
-  const now = context.currentTime;
-  const nodes = [];
-  for (const freq of freqs) {
-    const filter = context.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 1100;
-
-    const noteGain = context.createGain();
-    noteGain.gain.setValueAtTime(0, now);
-    noteGain.gain.linearRampToValueAtTime(0.9 / freqs.length, now + 1);
-    noteGain.gain.linearRampToValueAtTime(0, now + LOFI_CHORD_SECONDS);
-
-    const osc = context.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.value = freq;
-    const detune = context.createOscillator();
-    detune.type = "sine";
-    detune.frequency.value = freq * 1.004;
-
-    osc.connect(filter);
-    detune.connect(filter);
-    filter.connect(noteGain);
-    noteGain.connect(master);
-
-    osc.start(now);
-    detune.start(now);
-    osc.stop(now + LOFI_CHORD_SECONDS + 0.2);
-    detune.stop(now + LOFI_CHORD_SECONDS + 0.2);
-    nodes.push(filter, noteGain, osc, detune);
+function loadRainBuffer(context) {
+  if (!rainBufferPromise) {
+    rainBufferPromise = fetch(RAIN_URL)
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => context.decodeAudioData(arrayBuffer));
   }
-  return nodes;
+  return rainBufferPromise;
 }
 
-function playLofi(context, master) {
-  // Separate buses for pad and drums, both feeding the shared master gain,
-  // so the kick can duck the pad without touching the drums' own level.
-  const chordBus = context.createGain();
-  const drumBus = context.createGain();
-  chordBus.gain.value = 1;
-  drumBus.gain.value = 0.8;
-  chordBus.connect(master);
-  drumBus.connect(master);
-
-  let chordIndex = 0;
-  let chordTimerId = null;
-  const stepChords = () => {
-    playLofiChord(context, chordBus, LOFI_CHORDS[chordIndex % LOFI_CHORDS.length]);
-    chordIndex += 1;
-    chordTimerId = setTimeout(stepChords, LOFI_CHORD_SECONDS * 1000);
-  };
-  stepChords();
-
-  const stopDrums = playDrums(context, drumBus, chordBus);
-
+async function playRain(context, master) {
+  const audioBuffer = await loadRainBuffer(context);
+  const source = context.createBufferSource();
+  source.buffer = audioBuffer;
+  source.loop = true;
+  source.connect(master);
+  source.start();
   return () => {
-    clearTimeout(chordTimerId);
-    stopDrums();
-    chordBus.disconnect();
-    drumBus.disconnect();
+    source.stop();
+    source.disconnect();
   };
 }
 
@@ -335,7 +183,18 @@ export function play(kind) {
   master.gain.value = prefs.volume;
   master.connect(context.destination);
 
-  cleanup = kind === "lofi" ? playLofi(context, master) : playNoise(context, master, kind);
+  if (kind === "rain") {
+    // Decoding is async, so there's a brief gap with nothing to clean up yet;
+    // if stop()/play() is called again before it resolves, the loaded track
+    // is torn down immediately instead of clobbering whatever plays next.
+    cleanup = () => {};
+    playRain(context, master).then((stopFn) => {
+      if (currentKind === kind && gainNode === master) cleanup = stopFn;
+      else stopFn();
+    });
+  } else {
+    cleanup = playNoise(context, master, kind);
+  }
 
   gainNode = master;
   currentKind = kind;

@@ -8,6 +8,7 @@ from typing import Any
 
 def _active_dates(data: dict[str, Any]) -> set[str]:
     dates = {s["date"] for s in data["focus"]["sessions"]}
+    dates |= {s["date"] for s in data["dashboard"]["sessions"]}
     for task in data["tasks"]["items"]:
         if task["completed"] and task["due_date"]:
             dates.add(task["due_date"])

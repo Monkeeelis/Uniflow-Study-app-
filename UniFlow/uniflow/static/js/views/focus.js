@@ -210,7 +210,7 @@ function ambientControls() {
     h("div", { class: "switch mb-3", style: { flexWrap: "wrap" } }, AMBIENT_OPTIONS.map(optionPill)),
     h(
       "div",
-      { class: "row", style: { gap: "10px", maxWidth: "260px" } },
+      { class: "row mt-3", style: { gap: "10px", maxWidth: "260px" } },
       icon("volume", "icon-sm"),
       volumeSlider,
     ),
@@ -261,7 +261,7 @@ export function focusPage(state) {
     h(
       "div",
       { class: "grid grid-2 grid-tight grid-sm-4 mt-6" },
-      tile("Study today", `${focus.study_minutes_today}m`),
+      tile("Focus study today", `${focus.study_minutes_today}m`),
       tile("Pomodoros", focus.pomodoros_completed_today),
       tile("Timers done", focus.timers_completed_today),
       tile("All time", focus.study_hours_all),
