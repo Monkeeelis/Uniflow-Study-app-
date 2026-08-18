@@ -215,7 +215,15 @@ def view(data: dict[str, Any]) -> dict[str, Any]:
     section = data["focus"]
     sessions = section["sessions"]
     today = datetime.date.today().isoformat()
-    total_minutes_all = _study_seconds(sessions) // 60
+    # Study time is one pool whether it was logged here or from the
+    # dashboard's free-running stopwatch, so the totals shown here include
+    # both.
+    dashboard_sessions = data["dashboard"]["sessions"]
+    dashboard_seconds_today = sum(
+        s["duration_seconds"] for s in dashboard_sessions if s["date"] == today
+    )
+    dashboard_seconds_all = sum(s["duration_seconds"] for s in dashboard_sessions)
+    total_minutes_all = (_study_seconds(sessions) + dashboard_seconds_all) // 60
     hours, minutes = divmod(total_minutes_all, 60)
 
     return {
@@ -232,7 +240,8 @@ def view(data: dict[str, Any]) -> dict[str, Any]:
             {"index": i, "filled": i < section["completed_cycles"]}
             for i in range(section["total_cycles"])
         ],
-        "study_minutes_today": _study_seconds(sessions, today) // 60,
+        "study_minutes_today": (_study_seconds(sessions, today) + dashboard_seconds_today)
+        // 60,
         "study_hours_all": f"{hours}h {minutes}m",
         "sessions_today": len(
             [s for s in sessions if s["date"] == today and s["mode"] in STUDY_MODES]

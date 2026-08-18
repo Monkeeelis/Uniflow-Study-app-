@@ -261,7 +261,7 @@ export function focusPage(state) {
     h(
       "div",
       { class: "grid grid-2 grid-tight grid-sm-4 mt-6" },
-      tile("Focus study today", `${focus.study_minutes_today}m`),
+      tile("Today's total time", `${focus.study_minutes_today}m`),
       tile("Pomodoros", focus.pomodoros_completed_today),
       tile("Timers done", focus.timers_completed_today),
       tile("All time", focus.study_hours_all),

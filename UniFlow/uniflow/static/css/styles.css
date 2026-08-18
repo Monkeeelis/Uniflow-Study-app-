@@ -631,6 +631,9 @@ svg {
 :root[data-mode="dark"] .brand-mark {
   background-color: #f0e6d6;
 }
+:root[data-theme="high-contrast"] .brand-mark {
+  background-color: #ffffff;
+}
 
 @keyframes logo-intro-mark {
   0% {
@@ -802,6 +805,10 @@ svg {
   background: var(--accent-soft);
 }
 .notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   padding: 32px;
   text-align: center;
   color: var(--muted);

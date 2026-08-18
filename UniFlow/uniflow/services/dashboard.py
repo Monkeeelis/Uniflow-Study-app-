@@ -6,7 +6,7 @@ import datetime
 import uuid
 from typing import Any
 
-from uniflow.services import notifications
+from uniflow.services import focus, notifications
 from uniflow.services.common import clamp_int, toast
 
 MAX_TIMER_SECONDS = 24 * 60 * 60
@@ -190,13 +190,21 @@ def view(data: dict[str, Any]) -> dict[str, Any]:
     seconds_today = sum(
         s["duration_seconds"] for s in sessions if s["date"] == today
     )
+    # Study time is one pool whether it was logged from the dashboard's
+    # free-running stopwatch or a Focus pomodoro/timer session, so the totals
+    # shown here include both.
+    focus_sessions = data["focus"]["sessions"]
+    seconds_today += focus._study_seconds(focus_sessions, today)
+    seconds_all = sum(s["duration_seconds"] for s in sessions) + focus._study_seconds(
+        focus_sessions
+    )
     return {
         "quote": QUOTES[section["quote_index"] % len(QUOTES)],
         "quote_index": section["quote_index"],
         "timer_running": section["timer_running"],
         "timer_seconds": section["timer_seconds"],
         "today_display": _hm_display(seconds_today),
-        "all_display": _hm_display(sum(s["duration_seconds"] for s in sessions)),
+        "all_display": _hm_display(seconds_all),
         "sessions_today_count": len([s for s in sessions if s["date"] == today]),
         "sessions_total": len(sessions),
         "recent_sessions": _recent_sessions(sessions),

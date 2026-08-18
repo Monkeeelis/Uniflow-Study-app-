@@ -207,7 +207,7 @@ export function dashboardPage(state) {
       { class: "grid grid-2 grid-lg-4 mb-8" },
       statCard("list-checks", "Active Tasks", tasks.total_count - tasks.completed_count),
       statCard("circle-check", "Completed", tasks.completed_count, "teal"),
-      statCard("timer", "Study Today", dashboard.today_display),
+      statCard("timer", "Today's total time", dashboard.today_display),
       statCard("book", "Subjects", onboarding.subjects.length),
     ),
     h("h2", { class: "h2 mb-4" }, "Quick access"),

@@ -80,7 +80,7 @@ function notificationPanel(notifications) {
             "div",
             { class: "notif-empty" },
             icon("bell-off", "icon-xl"),
-            h("p", { class: "p small mt-2" }, "No notifications yet."),
+            h("p", { class: "p small" }, "No notifications yet."),
           ),
     ),
   );
@@ -118,16 +118,21 @@ function navbar(state) {
         h("span", { class: ["brand-name", playIntro && "brand-name-intro"] }, "UniFlow"),
       ),
       h("nav", { class: "nav-links" }, LINKS.map(link)),
-      h(
-        "button",
-        {
-          class: "icon-btn theme-toggle",
-          "aria-label": state.onboarding.dark_mode ? "Switch to light mode" : "Switch to dark mode",
-          title: state.onboarding.dark_mode ? "Switch to light mode" : "Switch to dark mode",
-          onClick: () => act("settings/theme/toggle"),
-        },
-        icon(state.onboarding.dark_mode ? "sun" : "moon", "icon-sm"),
-      ),
+      // High-contrast is a single fixed palette with no dark variant, so the
+      // light/dark toggle has nothing to do there — hide it rather than show
+      // a control that's a no-op.
+      state.onboarding.theme === "high-contrast"
+        ? null
+        : h(
+            "button",
+            {
+              class: "icon-btn theme-toggle",
+              "aria-label": state.onboarding.dark_mode ? "Switch to light mode" : "Switch to dark mode",
+              title: state.onboarding.dark_mode ? "Switch to light mode" : "Switch to dark mode",
+              onClick: () => act("settings/theme/toggle"),
+            },
+            icon(state.onboarding.dark_mode ? "sun" : "moon", "icon-sm"),
+          ),
       h(
         "div",
         { class: "bell-wrap" },
