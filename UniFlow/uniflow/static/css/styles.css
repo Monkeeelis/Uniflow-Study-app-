@@ -832,8 +832,11 @@ svg {
   border-radius: var(--r-md);
   border: 2px solid transparent;
   font-weight: 500;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.1s ease;
   white-space: nowrap;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.96);
 }
 .btn-primary {
   background: var(--accent);
@@ -902,11 +905,14 @@ svg {
   padding: 8px;
   border-radius: var(--r-sm);
   color: var(--muted);
-  transition: background-color 0.15s, color 0.15s;
+  transition: background-color 0.15s, color 0.15s, transform 0.1s ease;
 }
 .icon-btn:hover {
   background: var(--hover);
   color: var(--heading);
+}
+.icon-btn:active {
+  transform: scale(0.9);
 }
 .icon-btn-danger:hover {
   background: var(--danger-tint);
@@ -947,6 +953,10 @@ svg {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--heading);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.1s ease;
+}
+.pill:active {
+  transform: scale(0.95);
 }
 .pill:hover {
   background: var(--hover);
@@ -1258,7 +1268,10 @@ svg {
   background: var(--inset);
   color: var(--heading);
   text-align: left;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.1s ease;
+}
+.toggle-card:active {
+  transform: scale(0.98);
 }
 .toggle-card.is-on {
   border-color: var(--teal);
@@ -1830,8 +1843,12 @@ svg {
 }
 .timed-block {
   position: absolute;
+  /* left/width are set inline per-block so events overlapping in time sit
+     side by side in their own column instead of stacking on top of each
+     other; these are just a fallback for blocks with no inline position. */
   left: 4px;
   right: 4px;
+  box-sizing: border-box;
   padding: 6px 8px;
   border-radius: var(--r-sm);
   background: var(--inset);
@@ -2121,24 +2138,28 @@ svg {
   width: 12px;
   height: 12px;
 }
+/* Levels scale up how much of the active theme's accent colour is mixed in,
+   instead of a fixed amber palette, so the heatmap matches whichever theme
+   (and light/dark mode) is currently selected. */
 .heat-cell.level-1 {
-  background: #fde9b3;
+  background: color-mix(in srgb, var(--accent) 30%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
 .heat-cell.level-2 {
-  background: #fbbf24;
-  border-color: #f59e0b;
+  background: color-mix(in srgb, var(--accent) 50%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
 }
 .heat-cell.level-3 {
-  background: #d97706;
-  border-color: #b45309;
+  background: color-mix(in srgb, var(--accent) 70%, var(--panel));
+  border-color: var(--accent);
 }
 .heat-cell.level-4 {
-  background: #92400e;
-  border-color: #78350f;
+  background: var(--accent);
+  border-color: var(--accent-dark);
 }
 .heat-cell.level-5 {
-  background: #451a03;
-  border-color: #2d0f01;
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
 }
 .heat-cell.is-empty {
   background: transparent;
@@ -2438,8 +2459,12 @@ svg {
   color: var(--muted);
 }
 .notes-doc mark {
-  background: #ffe08a;
-  color: inherit;
+  /* Derived from the active theme's own colours (not a fixed hex) so it
+     stays legible and on-theme in both light and dark mode, and across
+     every colour theme, instead of a fixed light-yellow that goes
+     illegible against light text in dark mode. */
+  background: color-mix(in srgb, var(--accent) 35%, var(--panel));
+  color: var(--ink);
   border-radius: 2px;
   padding: 0 2px;
 }

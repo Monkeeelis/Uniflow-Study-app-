@@ -171,8 +171,11 @@ def submit(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | No
     note["updated_at"] = datetime.datetime.now().isoformat(timespec="minutes")
     _expand(section, _folder_key(note))
 
-    set_feedback(section, f"Saved: {note['title']}", "success")
-    return toast(f"Saved: {note['title']}", "success")
+    # No toast here: saving now happens automatically and frequently
+    # (autosave on every edit, plus on blur/navigation), so popping a
+    # notification each time would be constant noise rather than useful
+    # feedback.
+    return None
 
 
 def delete(data: dict[str, Any], note_id: str) -> dict[str, str] | None:

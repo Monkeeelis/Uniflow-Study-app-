@@ -155,6 +155,67 @@ function toolbarButton(iconName, label, command, value) {
   );
 }
 
+// document.execCommand("hiliteColor") is unreliable for reading back
+// whether the selection is already highlighted (queryCommandValue support
+// is inconsistent across browsers), so highlighting is done by hand with
+// real <mark> elements instead: wrap the selection in one to highlight,
+// or unwrap an ancestor <mark> to remove it. This makes "click again to
+// un-highlight" work every time instead of only when the browser's query
+// happens to agree the text is highlighted.
+function unwrapMark(mark) {
+  const parent = mark.parentNode;
+  while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+  parent.removeChild(mark);
+}
+
+function toggleHighlight() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+  const range = selection.getRangeAt(0);
+
+  const startMark = range.startContainer.nodeType === 3
+    ? range.startContainer.parentElement?.closest("mark")
+    : range.startContainer.closest?.("mark");
+  if (startMark) {
+    unwrapMark(startMark);
+    return;
+  }
+
+  // No inline colour here — .notes-doc mark in styles.css derives the
+  // highlight from the current theme's own --accent/--panel/--ink, so it
+  // stays readable (and on-theme) in both light and dark mode instead of
+  // painting a fixed light-yellow that goes illegible on a dark background.
+  const mark = document.createElement("mark");
+  try {
+    range.surroundContents(mark);
+  } catch {
+    // Selection crosses element boundaries (e.g. spans two paragraphs),
+    // so a single surroundContents() would fail — extract then rewrap.
+    const content = range.extractContents();
+    mark.appendChild(content);
+    range.insertNode(mark);
+  }
+  selection.removeAllRanges();
+  const after = document.createRange();
+  after.selectNodeContents(mark);
+  selection.addRange(after);
+}
+
+function highlightButton() {
+  return h(
+    "button",
+    {
+      class: "editor-tool",
+      type: "button",
+      "aria-label": "Highlight",
+      title: "Highlight",
+      onMouseDown: (event) => event.preventDefault(),
+      onClick: toggleHighlight,
+    },
+    icon("highlighter", "icon-sm"),
+  );
+}
+
 function fontControls(notes) {
   return h(
     "div",
@@ -262,6 +323,8 @@ function editorPane(notes, onboarding, flashcards) {
     class: "notes-title-input",
     value: note.title,
     placeholder: "Untitled note",
+    onInput: () => scheduleSave(),
+    onBlur: () => flushSave(),
   });
   let currentSubject = note.subject;
   const subjectSelect = selectField({
@@ -292,6 +355,8 @@ function editorPane(notes, onboarding, flashcards) {
     class: "input input-sm notes-tags-input",
     value: (note.tags || []).join(", "),
     placeholder: "Tags (comma separated)",
+    onInput: () => scheduleSave(),
+    onBlur: () => flushSave(),
   });
   const body = h("div", {
     class: "notes-doc",
@@ -301,9 +366,11 @@ function editorPane(notes, onboarding, flashcards) {
     onKeyDown: (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        save();
+        flushSave();
       }
     },
+    onInput: () => scheduleSave(),
+    onBlur: () => flushSave(),
   });
   body.innerHTML = note.content || "";
 
@@ -314,6 +381,20 @@ function editorPane(notes, onboarding, flashcards) {
       tags: tagsInput.value,
       content: body.innerHTML,
     });
+
+  // Autosave shortly after the user stops typing, so switching pages or
+  // toggling the theme — both of which re-render the whole app from the
+  // server's saved copy — never silently discards in-progress edits.
+  let saveTimer = null;
+  const scheduleSave = () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 800);
+  };
+  const flushSave = () => {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    save();
+  };
 
   return h(
     "div",
@@ -406,7 +487,7 @@ function editorPane(notes, onboarding, flashcards) {
         toolbarButton("italic", "Italic", "italic"),
         toolbarButton("underline", "Underline", "underline"),
         h("span", { class: "editor-tool-divider" }),
-        toolbarButton("highlighter", "Highlight", "hiliteColor", "#ffe08a"),
+        highlightButton(),
       ),
       fontControls(notes),
       h(

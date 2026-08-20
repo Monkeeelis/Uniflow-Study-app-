@@ -68,6 +68,8 @@ function timedBlock(cal, block) {
       style: {
         top: `${block.top}px`,
         height: `${block.height}px`,
+        left: `calc(${block.left_pct}% + 4px)`,
+        width: `calc(${block.width_pct}% - 8px)`,
         borderLeftColor: block.color,
       },
       onClick: () => openDetail(block.id),

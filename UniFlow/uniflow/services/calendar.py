@@ -111,8 +111,8 @@ def set_view(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | 
     if view_mode not in VIEW_MODES:
         return toast("Unknown calendar view.", "warning")
     section["view_mode"] = view_mode
-    set_feedback(section, f"Showing {view_mode} view.", "info")
-    return None
+    set_feedback(section, "", "")
+    return toast(f"Showing {view_mode} view.", "info")
 
 
 def navigate(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
@@ -120,8 +120,8 @@ def navigate(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | 
     direction = text(payload, "direction")
     if direction == "today":
         _store_date(section, datetime.date.today())
-        set_feedback(section, "Showing today.", "info")
-        return None
+        set_feedback(section, "", "")
+        return toast("Showing today.", "info")
     if direction not in ("prev", "next"):
         return toast("Unknown calendar move.", "warning")
 
@@ -139,8 +139,8 @@ def navigate(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | 
     else:
         days = 7 if section["view_mode"] == "week" else 1
         _store_date(section, current + datetime.timedelta(days=days * step))
-    set_feedback(section, f"Moved to {header_label(section)}.", "info")
-    return None
+    set_feedback(section, "", "")
+    return toast(f"Moved to {header_label(section)}.", "info")
 
 
 def set_event_form(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
@@ -433,6 +433,56 @@ def _to_timed_block(event: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _assign_lanes(blocks: list[dict[str, Any]]) -> None:
+    """Give each time-overlapping block a side-by-side column instead of
+    letting them stack on top of each other.
+
+    Greedy interval-graph colouring: walk blocks in start order, dropping
+    each into the first lane whose previous occupant has already ended.
+    Blocks are then grouped into clusters of transitively-overlapping
+    blocks, and every block in a cluster is stretched to split that
+    cluster's width evenly across however many lanes the cluster actually
+    used (not a hardcoded max), so two side-by-side events each get 50%
+    width while three way overlaps get a third each.
+    """
+    blocks.sort(key=lambda b: b["top"])
+    lane_ends: list[float] = []
+    for block in blocks:
+        start = block["top"]
+        end = start + block["height"]
+        lane = next((i for i, e in enumerate(lane_ends) if start >= e), None)
+        if lane is None:
+            lane = len(lane_ends)
+            lane_ends.append(end)
+        else:
+            lane_ends[lane] = end
+        block["_lane"] = lane
+
+    cluster: list[dict[str, Any]] = []
+    cluster_end = float("-inf")
+    clusters: list[list[dict[str, Any]]] = []
+    for block in blocks:
+        start = block["top"]
+        end = start + block["height"]
+        if cluster and start < cluster_end:
+            cluster.append(block)
+            cluster_end = max(cluster_end, end)
+        else:
+            if cluster:
+                clusters.append(cluster)
+            cluster = [block]
+            cluster_end = end
+    if cluster:
+        clusters.append(cluster)
+
+    for group in clusters:
+        lane_count = max(b["_lane"] for b in group) + 1
+        for block in group:
+            block["left_pct"] = round(100 * block["_lane"] / lane_count, 2)
+            block["width_pct"] = round(100 / lane_count, 2)
+            del block["_lane"]
+
+
 def _positioned_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for event in events:
@@ -441,7 +491,7 @@ def _positioned_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str
             continue
         grouped.setdefault(event["date"], []).append(block)
     for day in grouped:
-        grouped[day].sort(key=lambda b: b["top"])
+        _assign_lanes(grouped[day])
     return grouped
 
 

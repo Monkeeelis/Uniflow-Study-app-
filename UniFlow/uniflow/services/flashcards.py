@@ -195,7 +195,7 @@ def _extract_pairs(lines: list[str]) -> list[tuple[str, str]]:
 
 def generate_from_note(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]:
     """Turn a note's "Term: Definition" style lines into flashcards, filed
-    into a deck matching the note's subject (created if it doesn't exist)."""
+    into a deck matching the note's title (created if it doesn't exist)."""
     section = data["flashcards"]
     note_id = text(payload, "note_id")
     note = next((n for n in data["notes"]["items"] if n["id"] == note_id), None)
@@ -209,7 +209,7 @@ def generate_from_note(data: dict[str, Any], payload: dict[str, Any]) -> dict[st
             "warning",
         )
 
-    deck_name = note["subject"] or note["title"] or "General"
+    deck_name = note["title"] or note["subject"] or "General"
     deck = next((d for d in section["decks"] if d["name"] == deck_name), None)
     if deck is None:
         deck = {"id": str(uuid.uuid4()), "name": deck_name, "subject": note["subject"], "cards": []}
