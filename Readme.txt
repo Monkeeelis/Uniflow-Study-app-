@@ -1,81 +1,92 @@
+<div align="center">
+
+<img src="UniFlow/uniflow/static/img/logo-mark.png" alt="UniFlow logo" width="96" />
+
 # UniFlow
 
-A study planner: tasks, calendar, focus timers, flashcards and study insights.
+**An all-in-one study workspace — tasks, calendar, focus timers, notes, flashcards and study insights, in one tab.**
 
-An **HTML/CSS/JavaScript frontend** talking to a **Python (Flask) backend**. The
-backend owns all of the app's logic and data; the browser renders what it is
-given and dispatches actions back.
+[**🌐 Live app → uniflow.pythonanywhere.com**](https://uniflow.pythonanywhere.com/)
 
-## Running it
+[![Live demo](https://img.shields.io/badge/live-uniflow.pythonanywhere.com-0d9488?style=flat-square&logo=pythonanywhere&logoColor=white)](https://uniflow.pythonanywhere.com/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![Flask](https://img.shields.io/badge/flask-3.x-000000?style=flat-square&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![Frontend](https://img.shields.io/badge/frontend-vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](UniFlow/README.md#tech-stack)
+[![Build step](https://img.shields.io/badge/build%20step-none-success?style=flat-square)](#quick-start)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
-Flask is the only dependency.
+</div>
 
+---
+
+## What it is
+
+UniFlow is a study planner for students who are tired of juggling a to-do app, a
+calendar, a Pomodoro timer, a notes app and a flashcard app that all know
+nothing about each other. Everything shares one pool of data, so the pieces
+reinforce each other — a task with a due date lands on the calendar, focus time
+feeds your streak and heatmap, and a note becomes a flashcard deck in one click.
+
+**No account, no sign-up, no database.** Open the page and start working.
+
+| | |
+| --- | --- |
+| 📊 **Dashboard** | Study stopwatch, daily and all-time totals, streak, motivational quotes |
+| ✅ **Tasks** | Subjects, due dates, priorities, filtering and sorting |
+| 📅 **Calendar** | Month / week / day views, colour-coded categories, tasks shown inline |
+| ⏱️ **Focus** | Pomodoro and plain countdown, ambient noise and rain, chime, session logging |
+| 🧠 **Quiz** | Flashcard decks, flip-and-mark review, typed-answer quiz mode |
+| 📝 **Notes** | Rich text, folders by subject, search, pinning, note → deck generation |
+| 📈 **Insights** | GitHub-style study heatmap, weekly goal tracking |
+| 🎨 **Themes** | Five palettes, light/dark mode, and five colour-blind filters |
+
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/Monkeeelis/Uniflow-Study-app-.git
 ```
-pip install -r requirements.txt
+
+```bash
+cd "Uniflow-Study-app-/UniFlow" && pip install -r requirements.txt
+```
+
+```bash
 python -m uniflow
 ```
 
-Then open <http://127.0.0.1:5000>.
+Then open **<http://127.0.0.1:5000>**. Flask is the only dependency, and there is
+no build step.
 
-Environment variables: `UNIFLOW_PORT` (default 5000), `UNIFLOW_HOST`,
-`UNIFLOW_DEBUG` (`1` by default), `UNIFLOW_DATA_DIR` (default `./data`).
+---
 
-## How it fits together
+## Repository layout
 
-```
-uniflow/
-  app.py              Flask routes: the page shell plus one JSON action endpoint
-  state.py            Assembles the view model the browser renders from
-  store.py            Loads/saves the single JSON document in data/
-  services/           All of the logic, one module per feature area
-    onboarding.py     Wizard + the profile settings that share its fields
-    tasks.py          Create/edit/complete/filter/sort
-    calendar.py       Events, categories, month/week/day layout maths
-    focus.py          Pomodoro phases, timer, session log
-    dashboard.py      Quote rotation, free-running study timer
-    flashcards.py     Decks, cards, review and quiz sessions
-    insights.py       Study-time heatmap and its metrics
-    stats.py          Streak counting
-    notifications.py  The navbar bell feed
-  templates/
-    index.html        The only page the server renders
-  static/
-    css/styles.css    The warm cream notebook theme
-    js/
-      main.js         Fetches state, renders the route, re-renders on change
-      state.js        Holds the server's view model + the current route
-      api.js          fetch() wrapper for the action endpoints
-      timers.js       The two running clocks (see below)
-      dom.js          h() element builder
-      icons.js        Inline SVG icon set
-      ui.js           Shared building blocks (modal, select, badges, tiles)
-      format.js       Countdown/clock formatting
-      views/          One module per page
-```
+| Path | What it is |
+| --- | --- |
+| [`UniFlow/`](UniFlow/) | **The current app** — HTML/CSS/JS frontend with a Python (Flask) backend |
+| [`UniFlow/README.md`](UniFlow/README.md) | **Full documentation** — features, configuration, architecture, API, deployment |
+| [`LICENSE`](LICENSE) | MIT License |
+| `uniflow-final - 4-08/` | Archived earlier prototype, kept for reference |
 
-### The state flow
+---
 
-`GET /api/state` returns one view model containing every computed value —
-filtered task lists, the month grid, positioned calendar blocks, heatmap cells,
-streaks, and so on.
+## Documentation
 
-`POST /api/<action>` runs a single service function, saves, and returns the
-recomputed view model plus an optional toast. The browser replaces its copy and
-re-renders. Because there is exactly one source of truth, no piece of app state
-is ever calculated twice.
+Everything else — configuration, the state-flow architecture, the action API,
+deployment to PythonAnywhere and troubleshooting — lives in
+**[`UniFlow/README.md`](UniFlow/README.md)**.
 
-Every action lives in the `ACTIONS` table in `app.py` — that table is the API.
+---
 
-### The timers
+## License
 
-The Focus countdown and the dashboard stopwatch tick in the browser, because
-polling the server ten times a second would be wasteful. Python still decides
-when a pomodoro phase is over, logs the session, raises the notification and
-totals the stats. The browser reports its elapsed time on pause, skip and phase
-completion, plus a heartbeat every five seconds so closing the tab doesn't lose
-the current run.
+Released under the **MIT License** — see [`LICENSE`](LICENSE).
+Copyright © 2026 Monkeeelis.
 
-### Data
+<div align="center">
 
-Everything lives in `data/uniflow.json`, written atomically. Delete that file to
-start over. It is gitignored.
+**[Try UniFlow →](https://uniflow.pythonanywhere.com/)**
+
+</div>
