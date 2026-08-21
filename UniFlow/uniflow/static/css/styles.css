@@ -473,6 +473,22 @@ svg {
   margin: 0 auto;
   padding: 24px 16px;
 }
+/* Only applied when the route actually changes (see main.js), not on every
+   re-render, so switching tabs feels smooth without every action on a page
+   (typing, toggling something) replaying the animation. */
+.main.page-enter {
+  animation: page-enter 0.22s ease-out;
+}
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 @media (min-width: 640px) {
   .main {
@@ -692,10 +708,13 @@ svg {
   border-radius: var(--r-md);
   color: var(--heading);
   font-weight: 500;
-  transition: background-color 0.15s;
+  transition: background-color 0.15s, color 0.15s, transform 0.1s ease;
 }
 .nav-link:hover {
   background: var(--hover);
+}
+.nav-link:active {
+  transform: scale(0.94);
 }
 .nav-link.is-active {
   background: var(--accent-soft);

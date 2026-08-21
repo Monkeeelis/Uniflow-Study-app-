@@ -2,8 +2,8 @@
 // explorer sidebar (subjects as expandable folders, notes as files) picks
 // what you're studying; the main pane is a paper-styled document with a
 // floating bold/italic/underline/highlight toolbar and adjustable font.
-// Edits stay in the browser (like every other form in the app) until "Save"
-// — nothing is sent per keystroke.
+// Edits autosave shortly after you stop typing (or immediately on blur/
+// Ctrl+S), so nothing needs an explicit Save button.
 
 import { h } from "../dom.js";
 import { icon } from "../icons.js";
@@ -64,6 +64,7 @@ async function importNoteFile(file) {
 
 function sidebar(notes) {
   const searchInput = h("input", {
+    id: "notes-search",
     class: "input input-sm mb-3",
     placeholder: "Search notes... (Enter)",
     value: notes.search,
@@ -490,12 +491,6 @@ function editorPane(notes, onboarding, flashcards) {
         highlightButton(),
       ),
       fontControls(notes),
-      h(
-        "button",
-        { class: "btn btn-primary btn-sm", onClick: save, title: "Save (Ctrl+S)" },
-        icon("check", "icon-sm"),
-        "Save",
-      ),
     ),
   );
 }

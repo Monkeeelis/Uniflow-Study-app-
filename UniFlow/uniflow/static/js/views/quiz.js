@@ -50,7 +50,12 @@ function deckCard(deck) {
         h("span", { class: "tiny muted mono", style: { fontWeight: "700" } }, `${deck.count} cards`),
       ),
       h("p", { class: "p deck-name" }, deck.name),
-      deck.subject ? h("p", { class: "p badge badge-subject mt-2" }, deck.subject) : null,
+      h(
+        "div",
+        { class: "row mt-2", style: { gap: "6px", flexWrap: "wrap" } },
+        deck.subject ? h("p", { class: "p badge badge-subject" }, deck.subject) : null,
+        deck.due_count > 0 ? h("p", { class: "p badge badge-score-good" }, `${deck.due_count} due`) : null,
+      ),
     ),
     h(
       "button",
@@ -187,14 +192,17 @@ function deckDetailView(flashcards) {
           "button",
           {
             class: "btn btn-teal-outline",
-            onClick: () => act("flashcards/review/start", { mode: "flashcards" }),
+            onClick: () => act("flashcards/review/start", { mode: "flashcards", due_only: true }),
           },
           icon("book-open", "icon-sm"),
-          "Review",
+          flashcards.due_count > 0 ? `Review (${flashcards.due_count} due)` : "Review",
         ),
         h(
           "button",
-          { class: "btn btn-primary", onClick: () => act("flashcards/review/start", { mode: "quiz" }) },
+          {
+            class: "btn btn-primary",
+            onClick: () => act("flashcards/review/start", { mode: "quiz", due_only: true }),
+          },
           icon("check-check", "icon-sm"),
           "Quiz",
         ),
@@ -206,6 +214,15 @@ function deckDetailView(flashcards) {
         ),
       ),
     ),
+    deck.cards.length > 0 &&
+      h(
+        "button",
+        {
+          class: "link-btn mb-4",
+          onClick: () => act("flashcards/review/start", { mode: "flashcards", due_only: false }),
+        },
+        "Review all cards instead of just what's due",
+      ),
     deck.cards.length
       ? h("div", { class: "stack" }, deck.cards.map(cardRow))
       : emptyState("square-stack", "No cards in this deck. Add one to get started!"),

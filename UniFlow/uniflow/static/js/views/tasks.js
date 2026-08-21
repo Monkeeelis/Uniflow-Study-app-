@@ -4,7 +4,7 @@
 
 import { h } from "../dom.js";
 import { icon } from "../icons.js";
-import { act } from "../state.js";
+import { act, navigate } from "../state.js";
 import { banner, emptyState, modal, priorityBadge, selectField } from "../ui.js";
 
 function taskRow(task) {
@@ -43,6 +43,20 @@ function taskRow(task) {
     h(
       "div",
       { class: "row", style: { gap: "4px", flex: "none" } },
+      !task.completed &&
+        h(
+          "button",
+          {
+            class: "icon-btn",
+            "aria-label": "Start a focus session for this task",
+            title: "Start a focus session",
+            onClick: async () => {
+              await act("focus/mode", { mode: "timer" });
+              navigate("/focus");
+            },
+          },
+          icon("timer", "icon-sm"),
+        ),
       h(
         "button",
         {

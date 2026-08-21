@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import random
 import uuid
 from typing import Any
@@ -23,8 +24,41 @@ EMPTY_CARD: dict[str, Any] = {
     "back": "",
     "times_reviewed": 0,
     "times_correct": 0,
+    "interval_days": 0,
+    "next_due": "",
 }
 EMPTY_DECK: dict[str, Any] = {"id": "", "name": "", "subject": "", "cards": []}
+
+
+def _new_card(front: str, back: str) -> dict[str, Any]:
+    return {
+        "id": str(uuid.uuid4()),
+        "front": front,
+        "back": back,
+        "times_reviewed": 0,
+        "times_correct": 0,
+        "interval_days": 0,
+        "next_due": "",
+    }
+
+
+def _is_due(card: dict[str, Any], today: str) -> bool:
+    due = card.get("next_due") or ""
+    return due == "" or due <= today
+
+
+def _reschedule(card: dict[str, Any], correct: bool) -> None:
+    """Very small spaced-repetition scheduler: a correct answer doubles the
+    gap before the card is due again (starting at 1 day), a miss resets it
+    to due immediately, so struggled-with cards resurface every session
+    while well-known ones drift further apart."""
+    today = datetime.date.today()
+    if correct:
+        card["interval_days"] = max(1, card.get("interval_days", 0) * 2)
+        card["next_due"] = (today + datetime.timedelta(days=card["interval_days"])).isoformat()
+    else:
+        card["interval_days"] = 0
+        card["next_due"] = today.isoformat()
 
 
 def _deck(section: dict[str, Any]) -> dict[str, Any] | None:
@@ -139,15 +173,7 @@ def submit_card(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]
         existing["front"] = front
         existing["back"] = back
     else:
-        deck["cards"].append(
-            {
-                "id": str(uuid.uuid4()),
-                "front": front,
-                "back": back,
-                "times_reviewed": 0,
-                "times_correct": 0,
-            }
-        )
+        deck["cards"].append(_new_card(front, back))
 
     section["show_card_form"] = False
     section["editing_card_id"] = ""
@@ -220,15 +246,7 @@ def generate_from_note(data: dict[str, Any], payload: dict[str, Any]) -> dict[st
     for front, back in pairs[:_MAX_GENERATED_CARDS]:
         if front.lower() in existing_fronts:
             continue
-        deck["cards"].append(
-            {
-                "id": str(uuid.uuid4()),
-                "front": front,
-                "back": back,
-                "times_reviewed": 0,
-                "times_correct": 0,
-            }
-        )
+        deck["cards"].append(_new_card(front, back))
         existing_fronts.add(front.lower())
         created += 1
 
@@ -260,10 +278,14 @@ def start_review(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str
         if not missed:
             return toast("No missed cards to review.", "warning")
         order = missed
-        random.shuffle(order)
+    elif flag(payload, "due_only"):
+        today = datetime.date.today().isoformat()
+        order = [c["id"] for c in deck["cards"] if _is_due(c, today)]
+        if not order:
+            return toast("No cards due for review right now — try Review all.", "info")
     else:
         order = [c["id"] for c in deck["cards"]]
-        random.shuffle(order)
+    random.shuffle(order)
 
     _reset_review(section)
     section["review"].update({"mode": mode, "order": order})
@@ -283,6 +305,7 @@ def mark_result(data: dict[str, Any], payload: dict[str, Any]) -> None:
         return
     correct = flag(payload, "correct")
     card["times_reviewed"] += 1
+    _reschedule(card, correct)
     if correct:
         card["times_correct"] += 1
         section["review"]["correct"] += 1
@@ -302,6 +325,7 @@ def submit_answer(data: dict[str, Any], payload: dict[str, Any]) -> None:
         return
     correct = text(payload, "answer").lower() == card["back"].strip().lower()
     card["times_reviewed"] += 1
+    _reschedule(card, correct)
     if correct:
         card["times_correct"] += 1
         review["correct"] += 1
@@ -340,6 +364,7 @@ def view(data: dict[str, Any]) -> dict[str, Any]:
     deck = _deck(section)
     answered = review["correct"] + review["incorrect"]
     current = _current_card(section)
+    today = datetime.date.today().isoformat()
 
     return {
         "decks": section["decks"],
@@ -349,11 +374,13 @@ def view(data: dict[str, Any]) -> dict[str, Any]:
                 "name": d["name"],
                 "subject": d["subject"],
                 "count": len(d["cards"]),
+                "due_count": sum(1 for c in d["cards"] if _is_due(c, today)),
             }
             for d in section["decks"]
         ],
         "selected_deck_id": section["selected_deck_id"],
         "selected_deck": deck if deck is not None else dict(EMPTY_DECK),
+        "due_count": sum(1 for c in deck["cards"] if _is_due(c, today)) if deck else 0,
         "show_deck_form": section["show_deck_form"],
         "show_card_form": section["show_card_form"],
         "editing_card_id": section["editing_card_id"],

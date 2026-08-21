@@ -153,11 +153,11 @@ function navbar(state) {
   );
 }
 
-export function pageShell(state, content) {
+export function pageShell(state, content, animateEntry) {
   return h(
     "div",
     { class: "app-shell" },
     navbar(state),
-    h("main", { class: "main" }, content),
+    h("main", { class: ["main", animateEntry && "page-enter"] }, content),
   );
 }
