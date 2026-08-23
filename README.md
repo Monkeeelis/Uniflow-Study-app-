@@ -68,7 +68,6 @@ no build step.
 | [`UniFlow/`](UniFlow/) | **The current app** — HTML/CSS/JS frontend with a Python (Flask) backend |
 | [`UniFlow/README.md`](UniFlow/README.md) | **Full documentation** — features, configuration, architecture, API, deployment |
 | [`LICENSE`](LICENSE) | MIT License |
-| `uniflow-final - 4-08/` | Archived earlier prototype, kept for reference |
 
 ---
 
