@@ -6,6 +6,7 @@ import datetime
 import uuid
 from typing import Any
 
+from uniflow.services import notifications
 from uniflow.services.common import flag, set_feedback, text, toast
 
 PRIORITY_OPTIONS = ["Low", "Medium", "High"]
@@ -24,13 +25,16 @@ EMPTY_TASK: dict[str, Any] = {
     "completed": False,
     "notes": "",
     "show_on_calendar": False,
+    "overdue_notified": False,
 }
 
 
+# Wipes whatever inline message is currently showing on the tasks page.
 def clear_feedback(data: dict[str, Any]) -> None:
     set_feedback(data["tasks"], "", "")
 
 
+# Opens the create/edit form (or closes it) depending on the payload.
 def set_form(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section = data["tasks"]
     section["show_form"] = flag(payload, "open", True)
@@ -38,6 +42,7 @@ def set_form(data: dict[str, Any], payload: dict[str, Any]) -> None:
     set_feedback(section, "", "")
 
 
+# Handles the task form submit — new task if we're not editing one, otherwise patches the existing one in place.
 def submit(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["tasks"]
     title = text(payload, "title")
@@ -66,7 +71,12 @@ def submit(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | No
     if editing_id:
         for task in section["items"]:
             if task["id"] == editing_id:
+                due_date_changed = task["due_date"] != fields["due_date"]
                 task.update(fields)
+                # A rescheduled task deserves a fresh overdue notification if
+                # it lapses again later, so lift the "already told you" flag.
+                if due_date_changed:
+                    task["overdue_notified"] = False
                 was_editing = True
                 break
         if not was_editing:
@@ -86,13 +96,37 @@ def submit(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | No
     return toast(f"Task {action}: {title}", "success")
 
 
+# Find the task by id and flip its completed flag.
 def toggle_complete(data: dict[str, Any], task_id: str) -> None:
     for task in data["tasks"]["items"]:
         if task["id"] == task_id:
             task["completed"] = not task["completed"]
+            if not task["completed"]:
+                # Un-completing it means it's back in play — if it's still
+                # overdue, it should be able to notify again.
+                task["overdue_notified"] = False
             return
 
 
+# Called on every request so a task that's slipped past its due date since
+# the last check gets exactly one "overdue" notification, not one per page
+# load — overdue_notified is the guard that makes it a one-shot.
+def check_overdue(data: dict[str, Any]) -> None:
+    today = datetime.date.today().isoformat()
+    for task in data["tasks"]["items"]:
+        if task["completed"] or not task["due_date"] or task.get("overdue_notified"):
+            continue
+        if task["due_date"] < today:
+            notifications.add(
+                data,
+                "Task overdue",
+                f"\"{task['title']}\" was due {task['due_date']}.",
+                "warning",
+            )
+            task["overdue_notified"] = True
+
+
+# Removes the task by id; if it happened to be open in the edit form, close that too.
 def delete(data: dict[str, Any], task_id: str) -> dict[str, str] | None:
     section = data["tasks"]
     removed = next((t for t in section["items"] if t["id"] == task_id), None)
@@ -106,6 +140,7 @@ def delete(data: dict[str, Any], task_id: str) -> dict[str, str] | None:
     return toast(f"Deleted task: {removed['title']}", "info")
 
 
+# Only updates the filter/sort keys that were actually sent.
 def set_view(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section = data["tasks"]
     if "filter_subject" in payload:
@@ -120,6 +155,7 @@ def set_view(data: dict[str, Any], payload: dict[str, Any]) -> None:
         section["show_completed"] = flag(payload, "show_completed", True)
 
 
+# Show/hide toggle for completed tasks in the list.
 def toggle_show_completed(data: dict[str, Any]) -> None:
     section = data["tasks"]
     section["show_completed"] = not section["show_completed"]
@@ -128,6 +164,7 @@ def toggle_show_completed(data: dict[str, Any]) -> None:
 # --- computed values -------------------------------------------------------
 
 
+# Finds the task matching editing_id; if there isn't one, hand back an empty template instead.
 def _editing_task(section: dict[str, Any]) -> dict[str, Any]:
     for task in section["items"]:
         if task["id"] == section["editing_id"]:
@@ -135,12 +172,22 @@ def _editing_task(section: dict[str, Any]) -> dict[str, Any]:
     return dict(EMPTY_TASK)
 
 
+# Distinct subjects in use, sorted, with "All" tacked on the front for the dropdown.
 def _all_subjects(section: dict[str, Any]) -> list[str]:
     found = {t["subject"] for t in section["items"] if t["subject"]}
     return ["All"] + sorted(found)
 
 
+# Still open, has a due date, and that date is in the past.
+def _is_overdue(task: dict[str, Any], today: str) -> bool:
+    return not task["completed"] and bool(task["due_date"]) and task["due_date"] < today
+
+
+# Runs the current subject/priority/completed filters and sort order over the
+# list, then bumps overdue tasks to the very top regardless of which sort
+# the user picked — a task that's already late outranks everything else.
 def _filtered(section: dict[str, Any]) -> list[dict[str, Any]]:
+    today = datetime.date.today().isoformat()
     result = list(section["items"])
     if section["filter_subject"] != "All":
         result = [t for t in result if t["subject"] == section["filter_subject"]]
@@ -156,9 +203,13 @@ def _filtered(section: dict[str, Any]) -> list[dict[str, Any]]:
         result.sort(key=lambda t: PRIORITY_RANK.get(t["priority"], 3))
     elif section["sort_by"] == "title":
         result.sort(key=lambda t: t["title"].lower())
-    return result
+    # Stable sort: everything above keeps its relative order within the
+    # overdue/not-overdue groups it now gets split into.
+    result.sort(key=lambda t: not _is_overdue(t, today))
+    return [{**t, "is_overdue": _is_overdue(t, today)} for t in result]
 
 
+# Soonest-first, capped at 5 — only tasks that are still open and actually have a due date.
 def urgent_tasks(data: dict[str, Any]) -> list[dict[str, Any]]:
     today = datetime.date.today().isoformat()
     upcoming = [
@@ -170,6 +221,7 @@ def urgent_tasks(data: dict[str, Any]) -> list[dict[str, Any]]:
     return upcoming[:5]
 
 
+# Everything the tasks page renders from: filtered/sorted lists, counts, form state, the works.
 def view(data: dict[str, Any]) -> dict[str, Any]:
     section = data["tasks"]
     filtered = _filtered(section)

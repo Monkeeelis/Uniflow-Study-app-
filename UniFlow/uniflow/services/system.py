@@ -9,7 +9,7 @@ from uniflow.services.common import toast
 
 
 def reset(data: dict[str, Any]) -> dict[str, str]:
-    """Wipe every section back to its default, fresh-install shape."""
+    """Nukes everything and restores the fresh-install defaults."""
     fresh = store.default_data()
     data.clear()
     data.update(fresh)

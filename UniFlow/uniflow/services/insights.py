@@ -1,4 +1,4 @@
-"""Study-time heatmap and the summary metrics beside it."""
+"""The study-time heatmap plus the stat line next to it."""
 
 from __future__ import annotations
 
@@ -17,12 +17,15 @@ RANGE_LABELS = {
 }
 
 
+# User picked a different range tab (week/month/year).
 def set_range(data: dict[str, Any], payload: dict[str, Any]) -> None:
     mode = text(payload, "mode")
     if mode in RANGE_MODES:
         data["insights"]["range_mode"] = mode
 
 
+# Study minutes come from two different logs (dashboard stopwatch + focus
+# sessions); merge them into one date -> minutes map.
 def _minutes_by_date(data: dict[str, Any]) -> dict[str, int]:
     totals: dict[str, int] = {}
     for session in data["dashboard"]["sessions"]:
@@ -43,6 +46,7 @@ def _minutes_by_date(data: dict[str, Any]) -> dict[str, int]:
 _LEVEL_THRESHOLDS = (10, 30, 60, 120)
 
 
+# Maps minutes to one of the color levels defined by the thresholds above.
 def _level(minutes: int) -> int:
     if minutes <= 0:
         return 0
@@ -52,6 +56,7 @@ def _level(minutes: int) -> int:
     return len(_LEVEL_THRESHOLDS) + 1
 
 
+# Every date the heatmap grid needs to render, for whichever range is active.
 def _dates_in_range(range_mode: str, today: datetime.date) -> list[datetime.date]:
     if range_mode == "week":
         days = 7
@@ -68,6 +73,7 @@ def _dates_in_range(range_mode: str, today: datetime.date) -> list[datetime.date
     return [start + datetime.timedelta(days=i) for i in range(days)]
 
 
+# One cell per day for the current range — minutes, colour level, weekday, the works.
 def heatmap_cells(data: dict[str, Any]) -> list[dict[str, Any]]:
     range_mode = data["insights"]["range_mode"]
     minutes_map = _minutes_by_date(data)
@@ -94,8 +100,8 @@ def heatmap_cells(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _weekly_minutes(data: dict[str, Any], today: datetime.date) -> int:
-    """Calendar week (Mon-Sun) containing today, so the goal resets on a
-    predictable day rather than being a rolling 7-day window."""
+    """Minutes for the Mon-Sun week containing today — a fixed calendar
+    week, not a rolling 7 days, so the goal resets on a predictable day."""
     minutes_map = _minutes_by_date(data)
     start = today - datetime.timedelta(days=today.weekday())
     return sum(
@@ -104,6 +110,7 @@ def _weekly_minutes(data: dict[str, Any], today: datetime.date) -> int:
     )
 
 
+# Minutes -> "Xh Ym" (or just "Ym" under an hour).
 def _hm_display(minutes: int) -> str:
     hours, mins = divmod(minutes, 60)
     if hours > 0:
@@ -111,6 +118,7 @@ def _hm_display(minutes: int) -> str:
     return f"{mins}m"
 
 
+# Everything the insights page needs — cells, summary stats, weekly goal progress.
 def view(data: dict[str, Any]) -> dict[str, Any]:
     range_mode = data["insights"]["range_mode"]
     cells = heatmap_cells(data)

@@ -35,6 +35,7 @@ COLORBLIND_OPTIONS = [
 LAST_STEP = 3
 
 
+# Only touches the onboarding/profile fields that showed up in the payload.
 def update(data: dict[str, Any], payload: dict[str, Any]) -> None:
     ob = data["onboarding"]
     if "name" in payload:
@@ -53,6 +54,7 @@ def update(data: dict[str, Any], payload: dict[str, Any]) -> None:
         ob["notifications_enabled"] = flag(payload, "notifications_enabled")
 
 
+# Jump to a specific wizard step, or nudge it by a delta if no step was given; either way we clamp to [0, LAST_STEP].
 def set_step(data: dict[str, Any], payload: dict[str, Any]) -> None:
     ob = data["onboarding"]
     if "step" in payload:
@@ -70,6 +72,7 @@ def set_step(data: dict[str, Any], payload: dict[str, Any]) -> None:
     ob["step"] = max(0, min(LAST_STEP, target))
 
 
+# Bail out with a toast if the name is blank or already in the list.
 def add_subject(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     name = text(payload, "name")
     if not name:
@@ -81,33 +84,39 @@ def add_subject(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]
     return None
 
 
+# Drop a subject by name, nothing fancy.
 def remove_subject(data: dict[str, Any], name: str) -> None:
     ob = data["onboarding"]
     ob["subjects"] = [s for s in ob["subjects"] if s != name]
 
 
+# Just a toggle for the notifications pref.
 def toggle_notifications(data: dict[str, Any]) -> None:
     ob = data["onboarding"]
     ob["notifications_enabled"] = not ob["notifications_enabled"]
 
 
+# Same idea, but for dark mode.
 def toggle_theme(data: dict[str, Any]) -> None:
     ob = data["onboarding"]
     ob["dark_mode"] = not ob["dark_mode"]
 
 
+# Ignores the request silently if the theme value isn't one we recognise.
 def set_theme(data: dict[str, Any], payload: dict[str, Any]) -> None:
     value = text(payload, "theme")
     if value in {option["value"] for option in THEME_OPTIONS}:
         data["onboarding"]["theme"] = value
 
 
+# Same pattern as set_theme, but for the colourblind filter.
 def set_colorblind_mode(data: dict[str, Any], payload: dict[str, Any]) -> None:
     value = text(payload, "mode")
     if value in {option["value"] for option in COLORBLIND_OPTIONS}:
         data["onboarding"]["colorblind_mode"] = value
 
 
+# Marks this device as done with onboarding and sends back a greeting toast.
 def finish(data: dict[str, Any], device_id: str) -> dict[str, str]:
     ob = data["onboarding"]
     ob["completed"] = True
@@ -117,6 +126,7 @@ def finish(data: dict[str, Any], device_id: str) -> dict[str, str]:
     return toast(greeting, "success")
 
 
+# Everything the onboarding/profile screen needs, bundled up for this device.
 def view(data: dict[str, Any], device_id: str) -> dict[str, Any]:
     ob = data["onboarding"]
     return {

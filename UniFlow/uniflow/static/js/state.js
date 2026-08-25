@@ -33,6 +33,13 @@ function emit() {
   for (const fn of listeners) fn();
 }
 
+// For UI toggles that are pure client-side preference (not server data) —
+// e.g. collapsing a sidebar — and just need the page to re-render without a
+// round trip through act().
+export function refresh() {
+  emit();
+}
+
 export function setState(next) {
   current = next;
   const root = document.documentElement;

@@ -1,4 +1,4 @@
-"""Flashcard decks, plus the review and quiz sessions that run over them."""
+"""Flashcard decks and the review/quiz sessions that run over them."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ EMPTY_CARD: dict[str, Any] = {
 EMPTY_DECK: dict[str, Any] = {"id": "", "name": "", "subject": "", "cards": []}
 
 
+# Fresh card, review stats all zeroed out.
 def _new_card(front: str, back: str) -> dict[str, Any]:
     return {
         "id": str(uuid.uuid4()),
@@ -42,16 +43,17 @@ def _new_card(front: str, back: str) -> dict[str, Any]:
     }
 
 
+# No due date means it's never been scheduled, so treat that as due too.
 def _is_due(card: dict[str, Any], today: str) -> bool:
     due = card.get("next_due") or ""
     return due == "" or due <= today
 
 
 def _reschedule(card: dict[str, Any], correct: bool) -> None:
-    """Very small spaced-repetition scheduler: a correct answer doubles the
-    gap before the card is due again (starting at 1 day), a miss resets it
-    to due immediately, so struggled-with cards resurface every session
-    while well-known ones drift further apart."""
+    """Minimal spaced-repetition scheduler. Get it right and the gap before
+    the card comes up again doubles (starting from 1 day); miss it and it's
+    due again immediately - so cards you're shaky on keep showing up while
+    the ones you know drift further and further apart."""
     today = datetime.date.today()
     if correct:
         card["interval_days"] = max(1, card.get("interval_days", 0) * 2)
@@ -61,6 +63,7 @@ def _reschedule(card: dict[str, Any], correct: bool) -> None:
         card["next_due"] = today.isoformat()
 
 
+# Resolves selected_deck_id to the actual deck, or None if nothing's selected.
 def _deck(section: dict[str, Any]) -> dict[str, Any] | None:
     for deck in section["decks"]:
         if deck["id"] == section["selected_deck_id"]:
@@ -68,6 +71,7 @@ def _deck(section: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+# Finds a card by id inside a given deck.
 def _card(deck: dict[str, Any] | None, card_id: str) -> dict[str, Any] | None:
     if deck is None:
         return None
@@ -77,6 +81,7 @@ def _card(deck: dict[str, Any] | None, card_id: str) -> dict[str, Any] | None:
     return None
 
 
+# Whatever card the review cursor is sitting on right now; None once we're past the end.
 def _current_card(section: dict[str, Any]) -> dict[str, Any] | None:
     review = section["review"]
     if review["index"] >= len(review["order"]):
@@ -84,6 +89,7 @@ def _current_card(section: dict[str, Any]) -> dict[str, Any] | None:
     return _card(_deck(section), review["order"][review["index"]])
 
 
+# Wipes the review dict back to its empty starting shape.
 def _reset_review(section: dict[str, Any]) -> None:
     section["review"] = {
         "mode": "",
@@ -98,16 +104,19 @@ def _reset_review(section: dict[str, Any]) -> None:
     }
 
 
+# Dismisses the feedback banner on this page.
 def clear_feedback(data: dict[str, Any]) -> None:
     set_feedback(data["flashcards"], "", "")
 
 
+# Show/hide the new-deck form.
 def toggle_deck_form(data: dict[str, Any]) -> None:
     section = data["flashcards"]
     section["show_deck_form"] = not section["show_deck_form"]
     set_feedback(section, "", "")
 
 
+# Makes an empty deck out of whatever the deck form submitted.
 def create_deck(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]:
     section = data["flashcards"]
     name = text(payload, "name")
@@ -126,6 +135,7 @@ def create_deck(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]
     return toast(f"Deck created: {name}", "success")
 
 
+# Deletes by id. If it happened to be the selected deck, clears out the active review too.
 def delete_deck(data: dict[str, Any], deck_id: str) -> dict[str, str] | None:
     section = data["flashcards"]
     removed = next((d for d in section["decks"] if d["id"] == deck_id), None)
@@ -139,6 +149,7 @@ def delete_deck(data: dict[str, Any], deck_id: str) -> dict[str, str] | None:
     return toast(f"Deleted deck: {removed['name']}", "info")
 
 
+# Switching decks kills whatever review was in progress, since it belonged to the old deck.
 def select_deck(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section = data["flashcards"]
     section["selected_deck_id"] = text(payload, "deck_id")
@@ -147,6 +158,7 @@ def select_deck(data: dict[str, Any], payload: dict[str, Any]) -> None:
     _reset_review(section)
 
 
+# Opens the card form, remembering which card (if any) is being edited; closing clears that.
 def set_card_form(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section = data["flashcards"]
     section["show_card_form"] = flag(payload, "open", True)
@@ -155,6 +167,7 @@ def set_card_form(data: dict[str, Any], payload: dict[str, Any]) -> None:
     )
 
 
+# Needs both sides filled in and an open deck; otherwise creates or overwrites the card being edited.
 def submit_card(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]:
     section = data["flashcards"]
     front = text(payload, "front")
@@ -182,6 +195,7 @@ def submit_card(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]
     return toast(f"Card {action}.", "success")
 
 
+# Deletes a card and patches up the active review session so it doesn't reference a dead card.
 def delete_card(data: dict[str, Any], card_id: str) -> dict[str, str] | None:
     section = data["flashcards"]
     deck = _deck(section)
@@ -205,6 +219,7 @@ def delete_card(data: dict[str, Any], card_id: str) -> dict[str, str] | None:
     return toast(f"Deleted card: {label}", "info")
 
 
+# Scans lines for one of the _PAIR_SEPARATORS and splits into (term, definition) when found.
 def _extract_pairs(lines: list[str]) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for line in lines:
@@ -220,8 +235,8 @@ def _extract_pairs(lines: list[str]) -> list[tuple[str, str]]:
 
 
 def generate_from_note(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str]:
-    """Turn a note's "Term: Definition" style lines into flashcards, filed
-    into a deck matching the note's title (created if it doesn't exist)."""
+    """Scrape a note for "Term: Definition" lines and turn them into cards,
+    filing them into a deck named after the note (creating it if needed)."""
     section = data["flashcards"]
     note_id = text(payload, "note_id")
     note = next((n for n in data["notes"]["items"] if n["id"] == note_id), None)
@@ -260,6 +275,8 @@ def generate_from_note(data: dict[str, Any], payload: dict[str, Any]) -> dict[st
 # --- review / quiz ---------------------------------------------------------
 
 
+# Builds the shuffled queue for a session - due-only by default, but the
+# caller can ask for just the missed cards or the whole deck instead.
 def start_review(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["flashcards"]
     deck = _deck(section)
@@ -292,13 +309,14 @@ def start_review(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str
     return None
 
 
+# Just flips the flipped flag on the current card.
 def flip_card(data: dict[str, Any]) -> None:
     review = data["flashcards"]["review"]
     review["flipped"] = not review["flipped"]
 
 
 def mark_result(data: dict[str, Any], payload: dict[str, Any]) -> None:
-    """Flashcards mode: record the user's own honesty check ("did I know it?")."""
+    """Flashcards mode - just takes the user's own word for whether they knew it."""
     section = data["flashcards"]
     card = _current_card(section)
     if card is None:
@@ -316,7 +334,7 @@ def mark_result(data: dict[str, Any], payload: dict[str, Any]) -> None:
 
 
 def submit_answer(data: dict[str, Any], payload: dict[str, Any]) -> None:
-    """Quiz mode: grade a typed answer against the card's back, case-insensitively."""
+    """Quiz mode - compares the typed answer to the card's back, ignoring case."""
     section = data["flashcards"]
     review = section["review"]
     card = _current_card(section)
@@ -336,16 +354,19 @@ def submit_answer(data: dict[str, Any], payload: dict[str, Any]) -> None:
         review["missed"].append(card["id"])
 
 
+# Resets last_result and advances the cursor.
 def next_card(data: dict[str, Any]) -> None:
     section = data["flashcards"]
     section["review"]["last_result"] = ""
     _advance(section)
 
 
+# Bails out of whatever session is running.
 def exit_review(data: dict[str, Any]) -> None:
     _reset_review(data["flashcards"])
 
 
+# Steps the cursor forward one card; flags the session finished once we run out.
 def _advance(section: dict[str, Any]) -> None:
     review = section["review"]
     review["flipped"] = False
@@ -358,6 +379,7 @@ def _advance(section: dict[str, Any]) -> None:
 # --- computed values -------------------------------------------------------
 
 
+# Flashcards page view-model - decks, whichever one's selected, and the state of any active review.
 def view(data: dict[str, Any]) -> dict[str, Any]:
     section = data["flashcards"]
     review = section["review"]

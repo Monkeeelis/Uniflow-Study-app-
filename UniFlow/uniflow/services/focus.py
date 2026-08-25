@@ -1,9 +1,10 @@
 """Focus page: pomodoro cycles, plain timer, and the study session log.
 
-The countdown itself ticks in the browser — it would be wasteful to poll the
-server ten times a second. The browser reports the elapsed time when something
-meaningful happens (pause, skip, phase complete) and Python stays in charge of
-logging sessions, advancing phases and totalling the stats.
+The countdown itself runs client-side — polling the server ten times a
+second for a ticking clock would be silly. The browser just tells us the
+elapsed time when something worth recording happens (pause, skip, phase
+done), and Python handles logging sessions, advancing phases, and the
+running totals.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ STUDY_MODES = ("pomodoro-work", "timer")
 MAX_ELAPSED_DS = 24 * 60 * 60 * 10  # a day, as a sanity bound on client input
 
 
+# How long the current phase should run, in seconds.
 def target_seconds(data: dict[str, Any]) -> int:
     section = data["focus"]
     onboarding = data["onboarding"]
@@ -35,7 +37,7 @@ def target_seconds(data: dict[str, Any]) -> int:
 
 
 def _accept_elapsed(data: dict[str, Any], payload: dict[str, Any]) -> None:
-    """Trust the browser's clock, within the bounds of the current phase."""
+    """Client reports elapsed time; we just clamp it to the phase's bounds."""
     if "elapsed_ds" not in payload:
         return
     section = data["focus"]
@@ -43,6 +45,7 @@ def _accept_elapsed(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section["elapsed_ds"] = clamp_int(payload["elapsed_ds"], 0, limit)
 
 
+# Swaps modes and wipes progress back to a clean slate.
 def set_mode(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section = data["focus"]
     mode = text(payload, "mode")
@@ -54,6 +57,7 @@ def set_mode(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section["session_started_at"] = ""
 
 
+# Cycle count and/or timer length, whichever fields the user actually sent.
 def set_settings(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section = data["focus"]
     if "total_cycles" in payload:
@@ -68,6 +72,7 @@ def set_settings(data: dict[str, Any], payload: dict[str, Any]) -> None:
         )
 
 
+# Kick off the countdown, or resume it if it was already going.
 def start(data: dict[str, Any]) -> None:
     section = data["focus"]
     if section["running"]:
@@ -77,16 +82,18 @@ def start(data: dict[str, Any]) -> None:
         section["session_started_at"] = datetime.datetime.now().isoformat()
 
 
+# Stop running but keep whatever elapsed time the client last reported.
 def pause(data: dict[str, Any], payload: dict[str, Any]) -> None:
     _accept_elapsed(data, payload)
     data["focus"]["running"] = False
 
 
 def sync(data: dict[str, Any], payload: dict[str, Any]) -> None:
-    """Periodic heartbeat so a closed tab doesn't lose the running phase."""
+    """Called on an interval from the client so a dropped connection doesn't lose progress."""
     _accept_elapsed(data, payload)
 
 
+# Hard reset — same end state as a fresh set_mode, without changing mode.
 def reset(data: dict[str, Any]) -> None:
     section = data["focus"]
     section["running"] = False
@@ -96,13 +103,14 @@ def reset(data: dict[str, Any]) -> None:
     section["session_started_at"] = ""
 
 
+# User bailed early — jump to the next phase without the timer hitting zero.
 def skip(data: dict[str, Any], payload: dict[str, Any]) -> None:
     _accept_elapsed(data, payload)
     _advance(data, completed=False)
 
 
 def complete(data: dict[str, Any], payload: dict[str, Any]) -> None:
-    """Called by the browser when the countdown reaches the target."""
+    """Countdown hit zero client-side — snap elapsed to the target and advance."""
     section = data["focus"]
     section["elapsed_ds"] = target_seconds(data) * 10
     _accept_elapsed(data, payload)
@@ -110,10 +118,10 @@ def complete(data: dict[str, Any], payload: dict[str, Any]) -> None:
 
 
 def _advance(data: dict[str, Any], completed: bool) -> None:
-    """Log the phase that just ended and move to the next one.
+    """Log whatever phase just ended, then figure out what comes next.
 
-    Pomodoro alternates work -> break -> work, ending the whole set once
-    ``total_cycles`` work phases are done; plain timer mode just stops.
+    Pomodoro just cycles work -> break -> work until ``total_cycles`` work
+    phases are done, then stops; timer mode has nowhere to go but stop.
     """
     section = data["focus"]
     seconds = section["elapsed_ds"] // 10
@@ -154,6 +162,7 @@ def _advance(data: dict[str, Any], completed: bool) -> None:
         notifications.add(data, "Timer finished!", "Nice work.", "success")
 
 
+# Records the finished phase; zero-length ones aren't worth logging.
 def _log_session(
     data: dict[str, Any], mode: str, seconds: int, completed: bool
 ) -> None:
@@ -177,6 +186,7 @@ def _log_session(
 # --- computed values -------------------------------------------------------
 
 
+# Total study-mode seconds, across everything or just one day if given.
 def _study_seconds(sessions: list[dict[str, Any]], day: str | None = None) -> int:
     return sum(
         s["duration_seconds"]
@@ -185,6 +195,7 @@ def _study_seconds(sessions: list[dict[str, Any]], day: str | None = None) -> in
     )
 
 
+# Seconds -> "Xh Ym" / "Xm Ys" / "Xs", whichever units are relevant.
 def _duration_label(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, secs = divmod(remainder, 60)
@@ -195,6 +206,7 @@ def _duration_label(seconds: int) -> str:
     return f"{secs}s"
 
 
+# Last 8 sessions, newest first, formatted for the log table.
 def _recent_sessions(sessions: list[dict[str, Any]]) -> list[dict[str, str]]:
     labels = {"pomodoro-break": "Break", "timer": "Timer"}
     recent = []
@@ -211,6 +223,7 @@ def _recent_sessions(sessions: list[dict[str, Any]]) -> list[dict[str, str]]:
     return recent
 
 
+# Everything the focus page template needs: timer state, cycle dots, study totals.
 def view(data: dict[str, Any]) -> dict[str, Any]:
     section = data["focus"]
     sessions = section["sessions"]

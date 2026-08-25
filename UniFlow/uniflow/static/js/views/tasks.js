@@ -10,7 +10,7 @@ import { banner, emptyState, modal, priorityBadge, selectField } from "../ui.js"
 function taskRow(task) {
   return h(
     "div",
-    { class: "task-row" },
+    { class: ["task-row", task.is_overdue && "is-overdue"] },
     h(
       "button",
       {
@@ -27,7 +27,7 @@ function taskRow(task) {
         "div",
         { class: "row row-wrap", style: { gap: "12px" } },
         h("p", { class: ["p task-title", task.completed && "is-done"] }, task.title),
-        priorityBadge(task.priority),
+        task.is_overdue ? h("span", { class: "badge badge-overdue" }, "Overdue") : priorityBadge(task.priority),
       ),
       h(
         "div",

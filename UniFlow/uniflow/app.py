@@ -116,11 +116,12 @@ ACTIONS: dict[str, Action] = {
     "flashcards/feedback/clear": lambda data, p: flashcards.clear_feedback(data),
     "flashcards/generate-from-note": flashcards.generate_from_note,
     "notes/select": notes.select_note,
-    "notes/new": lambda data, p: notes.new_note(data),
+    "notes/new": lambda data, p: notes.new_note(data, p),
     "notes/save": notes.submit,
     "notes/delete": lambda data, p: notes.delete(data, text(p, "note_id")),
     "notes/pin": lambda data, p: notes.toggle_pin(data, text(p, "note_id")),
     "notes/folder/toggle": notes.toggle_folder,
+    "notes/folder/create": notes.create_folder,
     "notes/font": notes.set_font,
     "notes/view": notes.set_view,
     "notes/feedback/clear": lambda data, p: notes.clear_feedback(data),
@@ -189,9 +190,11 @@ def _page() -> str:
 
 
 def _state():
-    return jsonify(
-        {"state": build_state(store.load(g.device_id), g.device_id), "toast": None}
-    )
+    with _write_lock:
+        data = store.load(g.device_id)
+        tasks.check_overdue(data)
+        store.save(data, g.device_id)
+    return jsonify({"state": build_state(data, g.device_id), "toast": None})
 
 
 def _action(action: str):
@@ -205,6 +208,7 @@ def _action(action: str):
 
     with _write_lock:
         data = store.load(g.device_id)
+        tasks.check_overdue(data)
         try:
             result = handler(data, payload)
         except Exception:

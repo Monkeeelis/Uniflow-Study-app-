@@ -1,7 +1,7 @@
-"""Calendar: events, categories, and the month / week / day layouts.
+"""Calendar service - events, categories, month/week/day layouts.
 
-The layout maths lives here rather than in the browser so the views stay a
-straight port of the original Python.
+The grid positioning math is done here on purpose, not in JS, so the
+views stay a faithful port of the original Python.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ EMPTY_EVENT: dict[str, Any] = {
 }
 
 
+# "HH:MM" -> (hour, minute); None if it's empty or malformed.
 def _parse_hm(value: str) -> tuple[int, int] | None:
     if not value:
         return None
@@ -49,12 +50,14 @@ def _parse_hm(value: str) -> tuple[int, int] | None:
         return None
 
 
+# Inverse of _parse_hm - minutes since midnight back to "HH:MM", clamped so it can't spill into the next day.
 def _format_hm(total_min: int) -> str:
     total_min = max(0, min(24 * 60 - 1, total_min))
     hour, minute = divmod(total_min, 60)
     return f"{hour:02d}:{minute:02d}"
 
 
+# "Xh Ym" for the duration chip on an event block.
 def _format_duration_label(minutes: int) -> str:
     if minutes <= 0:
         return ""
@@ -66,6 +69,7 @@ def _format_duration_label(minutes: int) -> str:
     return f"{mins}m"
 
 
+# Pulls the stored year/month/day out of section; if it's ever corrupt we just fall back to today rather than blow up.
 def _current_date(section: dict[str, Any]) -> datetime.date:
     current = section["current"]
     try:
@@ -80,6 +84,7 @@ def _current_date(section: dict[str, Any]) -> datetime.date:
         return today
 
 
+# Counterpart to _current_date - splits a date object back into the section's fields.
 def _store_date(section: dict[str, Any], value: datetime.date) -> None:
     section["current"] = {
         "year": value.year,
@@ -87,6 +92,7 @@ def _store_date(section: dict[str, Any], value: datetime.date) -> None:
         "day": value.day,
     }
 
+# The title above the grid - "August 2026", a week range, or a full day name depending on view_mode.
 def header_label(section: dict[str, Any]) -> str:
     current = _current_date(section)
     if section["view_mode"] == "month":
@@ -101,10 +107,12 @@ def header_label(section: dict[str, Any]) -> str:
 # --- actions ---------------------------------------------------------------
 
 
+# Wipes whatever feedback banner is currently showing.
 def clear_feedback(data: dict[str, Any]) -> None:
     set_feedback(data["calendar"], "", "")
 
 
+# Handles the month/week/day toggle.
 def set_view(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["calendar"]
     view_mode = text(payload, "view")
@@ -115,6 +123,7 @@ def set_view(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | 
     return toast(f"Showing {view_mode} view.", "info")
 
 
+# Handles the today/prev/next buttons - steps by a month, week, or day depending on which view is active.
 def navigate(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["calendar"]
     direction = text(payload, "direction")
@@ -143,6 +152,7 @@ def navigate(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | 
     return toast(f"Moved to {header_label(section)}.", "info")
 
 
+# Opens the create/edit event form (or closes it). Task-backed events get redirected to the Tasks page instead.
 def set_event_form(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["calendar"]
     if not flag(payload, "open", True):
@@ -179,6 +189,7 @@ def set_event_form(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, s
     return None
 
 
+# Everything the event form needs before it can be saved - title, date, times all get checked, then we either create a new event or overwrite the one being edited.
 def submit_event(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["calendar"]
     title = text(payload, "title")
@@ -244,6 +255,7 @@ def submit_event(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str
     return toast(f"Event {action}: {title}", "success")
 
 
+# Deletes by id - refuses task_ prefixed ids since those aren't real events, just projections of a task.
 def delete_event(data: dict[str, Any], event_id: str) -> dict[str, str] | None:
     section = data["calendar"]
     section["show_event_detail"] = False
@@ -267,6 +279,7 @@ def delete_event(data: dict[str, Any], event_id: str) -> dict[str, str] | None:
     return toast(f"Deleted event: {removed['title']}", "success")
 
 
+# Toggles the read-only detail popup.
 def set_event_detail(data: dict[str, Any], payload: dict[str, Any]) -> None:
     section = data["calendar"]
     if flag(payload, "open", True):
@@ -277,11 +290,13 @@ def set_event_detail(data: dict[str, Any], payload: dict[str, Any]) -> None:
         section["detail_event_id"] = ""
 
 
+# Just flips show_category_form.
 def toggle_category_form(data: dict[str, Any]) -> None:
     section = data["calendar"]
     section["show_category_form"] = not section["show_category_form"]
 
 
+# Adds a category - name comparison is case-insensitive so "Study" and "study" can't both exist.
 def add_category(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["calendar"]
     name = text(payload, "name")
@@ -299,6 +314,7 @@ def add_category(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str
     return toast(f"Category added: {name}", "success")
 
 
+# Removing a category doesn't touch events already using it - they just keep their color as-is.
 def remove_category(data: dict[str, Any], name: str) -> dict[str, str]:
     section = data["calendar"]
     remaining = [c for c in section["categories"] if c["name"] != name]
@@ -319,10 +335,10 @@ def remove_category(data: dict[str, Any], name: str) -> dict[str, str]:
 
 
 def _task_events(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Turn calendar-enabled tasks into event-shaped dicts.
+    """Reshape calendar-enabled tasks so they look like events.
 
-    A task with a due time gets a default duration so it occupies a real block
-    on the day and week grids; all-day tasks appear without positioning.
+    Give a task with a due time a default duration so it takes up a real
+    block on the day/week grids - tasks with no time just show up unpositioned.
     """
     result = []
     for task in data["tasks"]["items"]:
@@ -350,10 +366,12 @@ def _task_events(data: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+# Real events plus the synthetic ones generated from tasks, merged into one list.
 def all_events(data: dict[str, Any]) -> list[dict[str, Any]]:
     return data["calendar"]["events"] + _task_events(data)
 
 
+# Month view grid: 7 columns, padded with blank cells at the start/end so weeks line up.
 def _month_cells(section: dict[str, Any]) -> list[dict[str, str]]:
     current = _current_date(section)
     first_day = datetime.date(current.year, current.month, 1)
@@ -377,6 +395,7 @@ def _month_cells(section: dict[str, Any]) -> list[dict[str, str]]:
     return cells
 
 
+# Buckets events by date; within a day, sorted by start time with all-day events pushed to the end.
 def _events_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for event in events:
@@ -387,11 +406,11 @@ def _events_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str, An
 
 
 def _to_timed_block(event: dict[str, Any]) -> dict[str, Any] | None:
-    """Convert a timed event into a pixel-positioned block for the day/week grid.
+    """Turn a timed event into a pixel-positioned block for the day/week grid.
 
-    Returns None for all-day events (no start time). Blocks that start before
-    the grid's visible window or run past midnight are clipped so they still
-    render inside the grid rather than overflowing it.
+    All-day events (no start time) return None here. Anything that starts
+    before the grid's visible window or runs past midnight gets clipped so
+    it stays inside the grid instead of overflowing.
     """
     parsed = _parse_hm(event["start_time"])
     if parsed is None:
@@ -434,16 +453,16 @@ def _to_timed_block(event: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _assign_lanes(blocks: list[dict[str, Any]]) -> None:
-    """Give each time-overlapping block a side-by-side column instead of
-    letting them stack on top of each other.
+    """Spread overlapping blocks into side-by-side columns instead of letting
+    them stack on top of each other.
 
-    Greedy interval-graph colouring: walk blocks in start order, dropping
-    each into the first lane whose previous occupant has already ended.
-    Blocks are then grouped into clusters of transitively-overlapping
-    blocks, and every block in a cluster is stretched to split that
-    cluster's width evenly across however many lanes the cluster actually
-    used (not a hardcoded max), so two side-by-side events each get 50%
-    width while three way overlaps get a third each.
+    Basically greedy interval-graph colouring - walk blocks in start order
+    and drop each into the first lane whose previous occupant has already
+    finished. Then group blocks into clusters of things that transitively
+    overlap, and stretch every block in a cluster to divide that cluster's
+    width evenly across however many lanes it actually needed (not some
+    fixed max), so a pair of overlapping events get 50% each and a three-way
+    overlap gets a third each.
     """
     blocks.sort(key=lambda b: b["top"])
     lane_ends: list[float] = []
@@ -483,6 +502,7 @@ def _assign_lanes(blocks: list[dict[str, Any]]) -> None:
             del block["_lane"]
 
 
+# Runs every timed event through _to_timed_block + _assign_lanes and groups the result by date.
 def _positioned_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for event in events:
@@ -495,6 +515,7 @@ def _positioned_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str
     return grouped
 
 
+# Same grouping idea as above, but for events with no start time.
 def _all_day_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for event in events:
@@ -503,6 +524,7 @@ def _all_day_by_date(events: list[dict[str, Any]]) -> dict[str, list[dict[str, A
     return grouped
 
 
+# The 6am-midnight labels running down the left edge of the day/week grid.
 def _hour_labels() -> list[dict[str, str]]:
     labels = []
     for index in range(GRID_HOURS):
@@ -518,6 +540,7 @@ def _hour_labels() -> list[dict[str, str]]:
     return labels
 
 
+# Mon-Sun header strip for the week view, with today flagged.
 def _week_days(section: dict[str, Any]) -> list[dict[str, str]]:
     current = _current_date(section)
     start = current - datetime.timedelta(days=current.weekday())
@@ -535,6 +558,7 @@ def _week_days(section: dict[str, Any]) -> list[dict[str, str]]:
     return days
 
 
+# Everything the template needs to render whichever view is active, in one dict.
 def view(data: dict[str, Any]) -> dict[str, Any]:
     section = data["calendar"]
     events = all_events(data)

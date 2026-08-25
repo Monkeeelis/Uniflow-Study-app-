@@ -473,6 +473,16 @@ svg {
   margin: 0 auto;
   padding: 24px 16px;
 }
+/* Notes: skip the usual top breathing room so the sidebar/editor start
+   right under the navbar, giving the document more vertical space. */
+.main.main-tight {
+  padding-top: 8px;
+}
+@media (min-width: 640px) {
+  .main.main-tight {
+    padding-top: 12px;
+  }
+}
 /* Only applied when the route actually changes (see main.js), not on every
    re-render, so switching tabs feels smooth without every action on a page
    (typing, toggling something) replaying the animation. */
@@ -708,13 +718,15 @@ svg {
   border-radius: var(--r-md);
   color: var(--heading);
   font-weight: 500;
-  transition: background-color 0.15s, color 0.15s, transform 0.1s ease;
+  transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out, transform 0.25s ease-in-out;
 }
 .nav-link:hover {
   background: var(--hover);
+  transform: translateY(-1px);
 }
 .nav-link:active {
-  transform: scale(0.94);
+  transform: translateY(0) scale(0.94);
+  transition-duration: 0.1s;
 }
 .nav-link.is-active {
   background: var(--accent-soft);
@@ -851,11 +863,20 @@ svg {
   border-radius: var(--r-md);
   border: 2px solid transparent;
   font-weight: 500;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.1s ease;
+  transition: background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, color 0.3s ease-in-out,
+    transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
   white-space: nowrap;
 }
+/* Lifts on hover, settles back on press — declared before :active so a
+   click always wins over the hover lift instead of fighting it. */
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
 .btn:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: translateY(0) scale(0.96);
+  box-shadow: none;
+  transition-duration: 0.1s;
 }
 .btn-primary {
   background: var(--accent);
@@ -924,14 +945,16 @@ svg {
   padding: 8px;
   border-radius: var(--r-sm);
   color: var(--muted);
-  transition: background-color 0.15s, color 0.15s, transform 0.1s ease;
+  transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out, transform 0.25s ease-in-out;
 }
 .icon-btn:hover {
   background: var(--hover);
   color: var(--heading);
+  transform: translateY(-1px);
 }
 .icon-btn:active {
-  transform: scale(0.9);
+  transform: translateY(0) scale(0.9);
+  transition-duration: 0.1s;
 }
 .icon-btn-danger:hover {
   background: var(--danger-tint);
@@ -972,13 +995,16 @@ svg {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--heading);
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.1s ease;
-}
-.pill:active {
-  transform: scale(0.95);
+  transition: background-color 0.25s ease-in-out, border-color 0.25s ease-in-out, color 0.25s ease-in-out,
+    transform 0.25s ease-in-out;
 }
 .pill:hover {
   background: var(--hover);
+  transform: translateY(-1px);
+}
+.pill:active {
+  transform: translateY(0) scale(0.95);
+  transition-duration: 0.1s;
 }
 .pill.is-active {
   background: var(--accent);
@@ -1090,6 +1116,10 @@ svg {
 .badge-high {
   background: var(--danger-soft);
   color: var(--danger-ink);
+}
+.badge-overdue {
+  background: var(--danger);
+  color: #fff;
 }
 .badge-medium {
   background: var(--amber-soft);
@@ -1287,10 +1317,17 @@ svg {
   background: var(--inset);
   color: var(--heading);
   text-align: left;
-  transition: background-color 0.15s, border-color 0.15s, transform 0.1s ease;
+  transition: background-color 0.25s ease-in-out, border-color 0.25s ease-in-out, transform 0.25s ease-in-out,
+    box-shadow 0.25s ease-in-out;
+}
+.toggle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 .toggle-card:active {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+  transition-duration: 0.1s;
 }
 .toggle-card.is-on {
   border-color: var(--teal);
@@ -1568,6 +1605,10 @@ svg {
   background: var(--panel);
   border: 2px solid var(--border);
   border-radius: var(--r-lg);
+}
+.task-row.is-overdue {
+  border-color: var(--danger-border);
+  background: var(--danger-tint);
 }
 .task-check {
   flex: none;
@@ -2239,32 +2280,94 @@ svg {
 }
 
 /* --- notes ------------------------------------------------------------------
-   A document editor, not another card grid — a dark "notebooks" sidebar
-   (subjects styled as folders) plus a paper-styled page on the right with a
-   floating formatting pill, all still riding the app's cream/accent theme. */
+   A document editor, not another card grid — a "notebooks" sidebar (subjects
+   styled as folders, matching the same panel look as every other widget)
+   plus a paper-styled page on the right with a floating formatting pill. */
 
+/* Flex rather than grid so the sidebar's width can transition smoothly when
+   collapsed — animating grid-template-columns isn't reliably smooth across
+   browsers, but a flex item's width/margin transitions fine everywhere. */
 .notes-layout {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 24px;
-  align-items: start;
+  display: flex;
+  align-items: flex-start;
 }
 @media (max-width: 860px) {
   .notes-layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    width: 100%;
   }
+  .notes-layout .notes-sidebar {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 24px;
+  }
+  .notes-layout .notes-sidebar.is-collapsed {
+    width: 100%;
+    height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+.notes-page {
+  position: relative;
+}
+/* Small tab pinned to the corner while the sidebar is collapsed, for
+   bringing it back. Hidden (but present, for a smooth cross-fade with the
+   sidebar's own transition) the rest of the time. */
+.notes-reopen-btn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  opacity: 0;
+  transform: translateX(-6px);
+  pointer-events: none;
+  transition: opacity 2s var(--notes-ease), transform 2s var(--notes-ease),
+    background-color 0.15s, color 0.15s;
+}
+.notes-reopen-btn.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+/* A smooth, slightly springy easing — used for every part of the
+   collapse/reopen transition so it all feels like one cohesive motion. */
+:root {
+  --notes-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .notes-sidebar {
-  /* Fixed dark-brown/cream palette regardless of theme mode, so this panel
-     doesn't invert to a light box when --heading/--cream flip in dark mode. */
-  --heading: #5c3a1e;
-  --cream: #faf1dd;
-  background: var(--heading);
+  /* Same panel/border treatment as every other widget/card in the app,
+     rather than a one-off colour, so it blends in with the current theme
+     instead of standing out as a fixed dark box. */
+  background: var(--panel);
+  border: 2px solid var(--border);
   border-radius: var(--r-lg);
   padding: 20px 16px;
   position: sticky;
   top: 24px;
+  width: 240px;
+  flex: none;
+  margin-right: 24px;
+  overflow: hidden;
+  transition: width 2s var(--notes-ease), margin-right 2s var(--notes-ease),
+    padding 2s var(--notes-ease), transform 2s var(--notes-ease), opacity 1.6s var(--notes-ease),
+    border-color 0.3s;
+}
+/* Collapsed: slides off to the left (rather than just shrinking in place)
+   while its width/margin/padding collapse to nothing at the same time, so
+   the editor pane smoothly expands into the freed space as it goes. */
+.notes-sidebar.is-collapsed {
+  width: 0;
+  min-width: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-color: transparent;
+  transform: translateX(-16px);
+  opacity: 0;
 }
 .notes-sidebar-title {
   margin: 0;
@@ -2272,10 +2375,10 @@ svg {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--cream) 70%, transparent);
+  color: var(--muted);
 }
 .notes-sidebar-muted {
-  color: color-mix(in srgb, var(--cream) 55%, transparent);
+  color: var(--muted);
 }
 .notebook-add {
   display: grid;
@@ -2284,12 +2387,13 @@ svg {
   height: 26px;
   border: none;
   border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--cream) 15%, transparent);
-  color: var(--cream);
+  background: var(--hover);
+  color: var(--heading);
   cursor: pointer;
 }
 .notebook-add:hover {
-  background: color-mix(in srgb, var(--cream) 25%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 
 .notebook-tree {
@@ -2310,18 +2414,43 @@ svg {
   border: none;
   border-radius: var(--r-sm);
   background: transparent;
-  color: color-mix(in srgb, var(--cream) 85%, transparent);
+  color: var(--heading);
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 .notebook-item:hover {
-  background: color-mix(in srgb, var(--cream) 12%, transparent);
+  background: var(--hover);
+}
+/* Wraps the folder button plus its hover-only "new file/folder" actions so
+   they sit on the same row without the button itself needing to know about
+   them. */
+.notebook-item-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.notebook-item-actions {
+  display: flex;
+  gap: 2px;
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.notebook-item-row:hover .notebook-item-actions {
+  opacity: 1;
+}
+.notebook-item-actions .icon-btn {
+  color: var(--muted);
+}
+.notebook-item-actions .icon-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 .notebook-count {
   font-family: var(--mono);
   font-size: 0.7rem;
-  color: color-mix(in srgb, var(--cream) 55%, transparent);
+  color: var(--muted);
 }
 
 /* File rows nested under an expanded folder. */
@@ -2344,17 +2473,17 @@ svg {
   border: none;
   border-radius: var(--r-sm);
   background: transparent;
-  color: color-mix(in srgb, var(--cream) 78%, transparent);
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 .notebook-file:hover {
-  background: color-mix(in srgb, var(--cream) 12%, transparent);
+  background: var(--hover);
 }
 .notebook-file.is-active {
-  background: var(--cream);
-  color: var(--accent-dark);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 .notebook-file-title {
@@ -2367,6 +2496,8 @@ svg {
 
 .notes-editor {
   position: relative;
+  flex: 1;
+  min-width: 0;
   background: var(--panel);
   border: 2px solid var(--border);
   border-radius: var(--r-lg);

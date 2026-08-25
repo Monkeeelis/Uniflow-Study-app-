@@ -158,6 +158,13 @@ export function pageShell(state, content, animateEntry) {
     "div",
     { class: "app-shell" },
     navbar(state),
-    h("main", { class: ["main", animateEntry && "page-enter"] }, content),
+    h(
+      "main",
+      // Notes wants the sidebar/editor to start right under the navbar
+      // instead of the usual page padding, so there's more vertical room
+      // for the document itself.
+      { class: ["main", animateEntry && "page-enter", currentRoute() === "/notes" && "main-tight"] },
+      content,
+    ),
   );
 }

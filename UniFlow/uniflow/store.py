@@ -121,6 +121,7 @@ def default_data() -> dict[str, Any]:
         },
         "notes": {
             "items": [],
+            "folders": [],
             "selected_note_id": "",
             "expanded_subjects": [],
             "search": "",

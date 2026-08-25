@@ -7,8 +7,13 @@
 
 import { h } from "../dom.js";
 import { icon } from "../icons.js";
-import { act } from "../state.js";
+import { act, refresh } from "../state.js";
 import { banner, emptyState, selectField } from "../ui.js";
+
+// Sidebar-collapsed is a per-device viewport preference, not app data, so it
+// lives here as plain module state instead of round-tripping through the
+// server like folder-expanded state does.
+let sidebarCollapsed = false;
 
 function fileItem(note, selectedId) {
   return h(
@@ -23,23 +28,67 @@ function fileItem(note, selectedId) {
   );
 }
 
-function folderGroup(group, selectedId) {
+function promptNewSubfolder(parentPath) {
+  const name = window.prompt("New folder name")?.trim();
+  if (name) act("notes/folder/create", { parent: parentPath, name });
+}
+
+function folderGroup(group, selectedId, depth = 0) {
   return h(
     "div",
     {},
     h(
-      "button",
-      {
-        class: "notebook-item",
-        onClick: () => act("notes/folder/toggle", { subject: group.subject }),
-      },
-      icon(group.expanded ? "chevron-down" : "chevron-right", "icon-xs"),
-      icon(group.expanded ? "folder-open" : "folder", "icon-sm"),
-      h("span", { class: "grow" }, group.subject),
-      h("span", { class: "notebook-count" }, String(group.notes.length)),
+      "div",
+      { class: "notebook-item-row" },
+      h(
+        "button",
+        {
+          class: "notebook-item grow",
+          onClick: () => act("notes/folder/toggle", { subject: group.subject }),
+        },
+        icon(group.expanded ? "chevron-down" : "chevron-right", "icon-xs"),
+        icon(group.expanded ? "folder-open" : "folder", "icon-sm"),
+        h("span", { class: "grow" }, group.name),
+        h("span", { class: "notebook-count" }, String(group.notes.length)),
+      ),
+      h(
+        "div",
+        { class: "notebook-item-actions" },
+        h(
+          "button",
+          {
+            class: "icon-btn icon-btn-sm",
+            "aria-label": `New note in ${group.name}`,
+            title: "New note here",
+            onClick: (event) => {
+              event.stopPropagation();
+              act("notes/new", { subject: group.subject });
+            },
+          },
+          icon("file-plus", "icon-xs"),
+        ),
+        h(
+          "button",
+          {
+            class: "icon-btn icon-btn-sm",
+            "aria-label": `New folder in ${group.name}`,
+            title: "New subfolder here",
+            onClick: (event) => {
+              event.stopPropagation();
+              promptNewSubfolder(group.subject);
+            },
+          },
+          icon("folder-plus", "icon-xs"),
+        ),
+      ),
     ),
     group.expanded
-      ? h("div", { class: "notebook-files" }, group.notes.map((n) => fileItem(n, selectedId)))
+      ? h(
+          "div",
+          { class: "notebook-files" },
+          group.children.map((child) => folderGroup(child, selectedId, depth + 1)),
+          group.notes.map((n) => fileItem(n, selectedId)),
+        )
       : null,
   );
 }
@@ -59,10 +108,10 @@ async function importNoteFile(file) {
   const raw = await file.text();
   const title = file.name.replace(/\.(md|markdown|txt)$/i, "") || "Imported note";
   await act("notes/new");
-  await act("notes/save", { title, subject: "", tags: "", content: markdownToHtml(raw) });
+  await act("notes/save", { title, subject: "", content: markdownToHtml(raw) });
 }
 
-function sidebar(notes) {
+function sidebar(notes, collapsed) {
   const searchInput = h("input", {
     id: "notes-search",
     class: "input input-sm mb-3",
@@ -89,7 +138,9 @@ function sidebar(notes) {
 
   return h(
     "aside",
-    { class: "notes-sidebar" },
+    // inert (not just visually hidden) so a collapsed sidebar's buttons/
+    // inputs can't be tabbed into or found by a screen reader while closed.
+    { class: ["notes-sidebar", collapsed && "is-collapsed"], inert: collapsed },
     h(
       "div",
       { class: "row-between mb-3" },
@@ -110,9 +161,20 @@ function sidebar(notes) {
         ),
         h(
           "button",
+          {
+            class: "notebook-add",
+            "aria-label": "New folder",
+            title: "New folder",
+            onClick: () => promptNewSubfolder(""),
+          },
+          icon("folder-plus", "icon-sm"),
+        ),
+        h(
+          "button",
           { class: "notebook-add", "aria-label": "New note", onClick: () => act("notes/new") },
           icon("plus", "icon-sm"),
         ),
+        sidebarToggle(),
       ),
     ),
     searchInput,
@@ -128,13 +190,50 @@ function sidebar(notes) {
   );
 }
 
+function collapseSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  refresh();
+}
+
+// Lives in the sidebar's own header row, next to New folder/Import/New note
+// — collapses it.
+function sidebarToggle() {
+  return h(
+    "button",
+    {
+      class: "notebook-add",
+      "aria-label": "Hide notebooks panel",
+      title: "Hide notebooks panel",
+      onClick: collapseSidebar,
+    },
+    icon("panel-left", "icon-sm"),
+  );
+}
+
+// Small tab pinned to the top-left corner of the page, for getting the
+// sidebar back once it's collapsed. Always rendered so its fade-in can
+// transition (see .notes-reopen-btn), rather than popping in instantly.
+function reopenButton(collapsed) {
+  return h(
+    "button",
+    {
+      class: ["icon-btn", "notes-reopen-btn", collapsed && "is-visible"],
+      "aria-label": "Show notebooks panel",
+      title: "Show notebooks panel",
+      inert: !collapsed,
+      onClick: collapseSidebar,
+    },
+    icon("panel-left", "icon-sm"),
+  );
+}
+
 function breadcrumb(note) {
+  const segments = note.subject ? note.subject.split("/") : ["Unfiled"];
   return h(
     "div",
     { class: "notes-breadcrumb" },
     h("span", {}, "Notebooks"),
-    icon("chevron-right", "icon-xs"),
-    h("span", {}, note.subject || "Unfiled"),
+    ...segments.flatMap((segment) => [icon("chevron-right", "icon-xs"), h("span", {}, segment)]),
     icon("chevron-right", "icon-xs"),
     h("span", { class: "is-current" }, note.title),
   );
@@ -352,13 +451,6 @@ function editorPane(notes, onboarding, flashcards) {
       save();
     },
   });
-  const tagsInput = h("input", {
-    class: "input input-sm notes-tags-input",
-    value: (note.tags || []).join(", "),
-    placeholder: "Tags (comma separated)",
-    onInput: () => scheduleSave(),
-    onBlur: () => flushSave(),
-  });
   const body = h("div", {
     class: "notes-doc",
     style: { "--notes-font-family": notes.font_family_css, "--notes-font-size": notes.font_size_css },
@@ -379,7 +471,6 @@ function editorPane(notes, onboarding, flashcards) {
     act("notes/save", {
       title: titleInput.value,
       subject: currentSubject,
-      tags: tagsInput.value,
       content: body.innerHTML,
     });
 
@@ -474,7 +565,6 @@ function editorPane(notes, onboarding, flashcards) {
       "div",
       { class: "row mt-1 mb-4", style: { gap: "12px", flexWrap: "wrap", alignItems: "center" } },
       subjectSelect,
-      tagsInput,
       h("p", { class: "p tiny muted mono" }, `${notes.word_count} words · updated ${note.updated_at}`),
     ),
     body,
@@ -501,8 +591,16 @@ export function notesPage(state) {
 
   return h(
     "div",
-    {},
+    { class: "notes-page" },
     feedback && h("div", { class: "mb-4" }, feedback),
-    h("div", { class: "notes-layout" }, sidebar(notes), editorPane(notes, onboarding, flashcards)),
+    reopenButton(sidebarCollapsed),
+    h(
+      "div",
+      { class: "notes-layout" },
+      // Always rendered (never conditionally omitted) so collapsing it can
+      // animate smoothly via CSS instead of just popping out of the DOM.
+      sidebar(notes, sidebarCollapsed),
+      editorPane(notes, onboarding, flashcards),
+    ),
   );
 }

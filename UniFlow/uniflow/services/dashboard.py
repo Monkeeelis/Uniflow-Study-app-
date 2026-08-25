@@ -1,4 +1,4 @@
-"""Dashboard: rotating quote and the free-running study timer."""
+"""Dashboard - the rotating motivational quote plus the free-running study timer."""
 
 from __future__ import annotations
 
@@ -75,11 +75,13 @@ QUOTES: list[dict[str, str]] = [
 ]
 
 
+# Bumps quote_index, wrapping back to 0 once we hit the end of QUOTES.
 def next_quote(data: dict[str, Any]) -> None:
     section = data["dashboard"]
     section["quote_index"] = (section["quote_index"] + 1) % len(QUOTES)
 
 
+# If the client bothered to send a "seconds" value, trust it and store it (clamped).
 def _accept_seconds(data: dict[str, Any], payload: dict[str, Any]) -> None:
     if "seconds" not in payload:
         return
@@ -88,6 +90,7 @@ def _accept_seconds(data: dict[str, Any], payload: dict[str, Any]) -> None:
     )
 
 
+# Starts the timer, or resumes it if it's already got a start time. No-op if it's already running.
 def start_timer(data: dict[str, Any]) -> None:
     section = data["dashboard"]
     if section["timer_running"]:
@@ -97,16 +100,18 @@ def start_timer(data: dict[str, Any]) -> None:
         section["timer_started_at"] = datetime.datetime.now().isoformat()
 
 
+# Stops running but keeps the elapsed seconds the client last reported.
 def pause_timer(data: dict[str, Any], payload: dict[str, Any]) -> None:
     _accept_seconds(data, payload)
     data["dashboard"]["timer_running"] = False
 
 
 def sync_timer(data: dict[str, Any], payload: dict[str, Any]) -> None:
-    """Periodic heartbeat so a closed tab doesn't lose the elapsed time."""
+    """Called periodically from the client so we don't lose progress if the tab gets closed mid-session."""
     _accept_seconds(data, payload)
 
 
+# Hard reset - stops the timer and zeroes everything, nothing gets saved.
 def reset_timer(data: dict[str, Any]) -> None:
     section = data["dashboard"]
     section["timer_running"] = False
@@ -114,6 +119,7 @@ def reset_timer(data: dict[str, Any]) -> None:
     section["timer_started_at"] = ""
 
 
+# Stops the timer and, assuming there's actually time on the clock, logs it as a completed study session.
 def stop_and_save(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, str] | None:
     section = data["dashboard"]
     _accept_seconds(data, payload)
@@ -146,6 +152,7 @@ def stop_and_save(data: dict[str, Any], payload: dict[str, Any]) -> dict[str, st
     return toast(f"Saved {minutes}m {secs}s of study time.", "success")
 
 
+# Drops a session from history by id.
 def delete_session(data: dict[str, Any], session_id: str) -> None:
     section = data["dashboard"]
     section["sessions"] = [s for s in section["sessions"] if s["id"] != session_id]
@@ -154,6 +161,7 @@ def delete_session(data: dict[str, Any], session_id: str) -> None:
 # --- computed values -------------------------------------------------------
 
 
+# Seconds -> "Xh Ym" for the totals shown on the dashboard.
 def _hm_display(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes = remainder // 60
@@ -162,6 +170,7 @@ def _hm_display(seconds: int) -> str:
     return f"{minutes}m"
 
 
+# Last 5 sessions, newest first, with duration already formatted for display.
 def _recent_sessions(sessions: list[dict[str, Any]]) -> list[dict[str, str]]:
     recent = []
     for session in list(reversed(sessions))[:5]:
@@ -183,6 +192,7 @@ def _recent_sessions(sessions: list[dict[str, Any]]) -> list[dict[str, str]]:
     return recent
 
 
+# Dashboard view-model - today/all-time totals plus the recent session list.
 def view(data: dict[str, Any]) -> dict[str, Any]:
     section = data["dashboard"]
     sessions = section["sessions"]

@@ -6,6 +6,7 @@ import datetime
 from typing import Any
 
 
+# Union of every date with a focus session, dashboard session, or a completed task due that day.
 def _active_dates(data: dict[str, Any]) -> set[str]:
     dates = {s["date"] for s in data["focus"]["sessions"]}
     dates |= {s["date"] for s in data["dashboard"]["sessions"]}
@@ -15,6 +16,7 @@ def _active_dates(data: dict[str, Any]) -> set[str]:
     return dates
 
 
+# Walks backward day by day counting the run of active days; if today has no activity yet we start counting from yesterday instead.
 def streak_days(data: dict[str, Any]) -> int:
     active = _active_dates(data)
     if not active:
@@ -31,6 +33,7 @@ def streak_days(data: dict[str, Any]) -> int:
     return streak
 
 
+# Encouragement copy, tiered by how long the streak is.
 def motivation_message(streak: int) -> str:
     if streak == 0:
         return "Start a session today to begin your streak!"
@@ -41,6 +44,7 @@ def motivation_message(streak: int) -> str:
     return f"🔥🔥 {streak} day streak! You're on fire."
 
 
+# Small view-model — just the streak count plus its message.
 def view(data: dict[str, Any]) -> dict[str, Any]:
     streak = streak_days(data)
     return {
