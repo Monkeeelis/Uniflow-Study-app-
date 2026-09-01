@@ -3,6 +3,10 @@
 The Reflex build kept everything in per-session server memory, so closing the
 tab lost the lot. Now that the browser owns the UI, one JSON document on disk
 holds the whole app and survives restarts.
+
+One document per device, so visitors never read each other's data. Where the
+host has no persistent disk (Vercel and friends) the same documents go to a
+key-value store over HTTP instead; see the backend sections below.
 """
 
 from __future__ import annotations
@@ -11,8 +15,12 @@ import datetime
 import json
 import logging
 import os
+import re
 import tempfile
 import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -165,6 +173,79 @@ def _merge(defaults: Any, saved: Any) -> Any:
     return saved if _same_shape(defaults, saved) else defaults
 
 
+# --- identity ---------------------------------------------------------------
+
+# The device id arrives from a browser cookie, so it decides a filename and a
+# KV key from untrusted input. Anything but hex/dashes is dropped: without this
+# a cookie of "../../secrets" would escape the devices directory.
+_SAFE_ID = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _safe_id(device_id: str) -> str:
+    return _SAFE_ID.sub("", device_id)[:64] or "anonymous"
+
+
+# --- key-value backend (serverless hosting) ---------------------------------
+
+# Locally there is a real disk and the documents live in data/devices/. A
+# serverless host has no disk worth the name: the filesystem is read-only apart
+# from /tmp, and /tmp belongs to one short-lived instance, so a document
+# written on one request is missing on the next and every visitor looks like a
+# brand new one. When the Upstash/Vercel KV variables are set we store the same
+# JSON over HTTP instead — one document per device, shared by every instance
+# and outliving all of them.
+
+KV_URL = (
+    os.environ.get("KV_REST_API_URL")
+    or os.environ.get("UPSTASH_REDIS_REST_URL")
+    or ""
+).rstrip("/")
+KV_TOKEN = (
+    os.environ.get("KV_REST_API_TOKEN")
+    or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    or ""
+)
+KV_TIMEOUT = 5  # seconds — a slow store must not hang the page forever
+
+
+def using_kv() -> bool:
+    """True when the app is configured to persist to the key-value store."""
+    return bool(KV_URL and KV_TOKEN)
+
+
+def _kv_call(path: str, body: bytes | None = None) -> Any:
+    request = urllib.request.Request(
+        f"{KV_URL}/{path}",
+        data=body,
+        headers={"Authorization": f"Bearer {KV_TOKEN}"},
+        method="GET" if body is None else "POST",
+    )
+    with urllib.request.urlopen(request, timeout=KV_TIMEOUT) as response:
+        return json.loads(response.read().decode("utf-8")).get("result")
+
+
+def _kv_load(device_id: str) -> str | None:
+    key = urllib.parse.quote(f"uniflow:device:{device_id}", safe="")
+    try:
+        result = _kv_call(f"get/{key}")
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        # A store that is down should look like a first visit, not a 500.
+        logging.exception(f"Could not read device {device_id} from KV: {e}")
+        return None
+    return result if isinstance(result, str) else None
+
+
+def _kv_save(payload: str, device_id: str) -> None:
+    key = urllib.parse.quote(f"uniflow:device:{device_id}", safe="")
+    try:
+        _kv_call(f"set/{key}", payload.encode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        logging.exception(f"Could not save device {device_id} to KV: {e}")
+
+
+# --- file backend (local development) ---------------------------------------
+
+
 def _device_file(device_id: str) -> Path:
     return DEVICES_DIR / f"{device_id}.json"
 
@@ -181,27 +262,22 @@ def _migrate_legacy_file(device_file: Path) -> None:
         DATA_FILE.replace(device_file)
 
 
-def load(device_id: str) -> dict[str, Any]:
-    defaults = default_data()
+def _file_load(device_id: str) -> str | None:
     device_file = _device_file(device_id)
     if not device_file.exists():
         _migrate_legacy_file(device_file)
     if not device_file.exists():
-        return defaults
+        return None
     try:
-        saved = json.loads(device_file.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
+        return device_file.read_text(encoding="utf-8")
+    except OSError as e:
         logging.exception(f"Could not read {device_file}, starting fresh: {e}")
-        return defaults
-    if not isinstance(saved, dict):
-        return defaults
-    return _merge(defaults, saved)
+        return None
 
 
-def save(data: dict[str, Any], device_id: str) -> None:
+def _file_save(payload: str, device_id: str) -> None:
     DEVICES_DIR.mkdir(parents=True, exist_ok=True)
     device_file = _device_file(device_id)
-    payload = json.dumps(data, indent=2, ensure_ascii=False)
     # Write beside the target then swap, so a crash never truncates the file.
     handle, tmp_path = tempfile.mkstemp(dir=DEVICES_DIR, suffix=".tmp")
     try:
@@ -211,3 +287,31 @@ def save(data: dict[str, Any], device_id: str) -> None:
     except OSError as e:
         logging.exception(f"Could not save {device_file}: {e}")
         Path(tmp_path).unlink(missing_ok=True)
+
+
+# --- public API -------------------------------------------------------------
+
+
+def load(device_id: str) -> dict[str, Any]:
+    defaults = default_data()
+    device_id = _safe_id(device_id)
+    raw = _kv_load(device_id) if using_kv() else _file_load(device_id)
+    if raw is None:
+        return defaults
+    try:
+        saved = json.loads(raw)
+    except ValueError as e:
+        logging.exception(f"Unreadable document for {device_id}, starting fresh: {e}")
+        return defaults
+    if not isinstance(saved, dict):
+        return defaults
+    return _merge(defaults, saved)
+
+
+def save(data: dict[str, Any], device_id: str) -> None:
+    device_id = _safe_id(device_id)
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    if using_kv():
+        _kv_save(payload, device_id)
+    else:
+        _file_save(payload, device_id)
