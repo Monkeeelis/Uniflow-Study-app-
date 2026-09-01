@@ -1,0 +1,20 @@
+"""Vercel serverless entrypoint.
+
+Vercel imports this module and serves the WSGI callable named ``app``. The
+Flask app itself lives one level down in ``UniFlow/uniflow``, so the package
+directory goes on sys.path before the import. Vercel's filesystem is read-only
+apart from /tmp, so the JSON store is pointed there.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "UniFlow"))
+
+os.environ.setdefault("UNIFLOW_DATA_DIR", "/tmp/uniflow-data")
+
+from uniflow.app import app  # noqa: E402  (path setup has to run first)
